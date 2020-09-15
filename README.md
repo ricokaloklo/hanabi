@@ -1,3 +1,3 @@
 # hanabi
 
-HierArchical bayesiaN Analysis on lensed GW signals with BIlby
+Hierarchical bayesian ANAlysis on lensed GW signals using BIlby
