@@ -1,0 +1,2 @@
+class JointResults(object):
+    pass
