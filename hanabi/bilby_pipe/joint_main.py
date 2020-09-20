@@ -179,8 +179,15 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
     parallel_node_list = []
 
     # (Parallel) AnalysisNode and MergeNode
-    logger = logging.getLogger(__prog__)
-    logger.warn(f"Ignore the following messages from bilby_pipe")
+
+    # Suppress bilby_pipe logging
+    try:
+        bilby_pipe_logger = logging.getLogger("bilby_pipe")
+        old_level = bilby_pipe_logger.level
+        bilby_pipe_logger.setLevel(logging.CRITICAL)
+    except:
+        pass
+
     for parallel_idx in parallel_list:
         analysis_node = JointAnalysisNode(
             joint_main_input,
@@ -190,6 +197,12 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
         )
         parallel_node_list.append(analysis_node)
         all_parallel_node_list.append(analysis_node)
+
+    # Resume bilby_pipe logging
+    try:
+        bilby_pipe_logger.setLevel(old_level)
+    except:
+        pass
 
     if len(parallel_node_list) == 1:
         merged_node_list.append(analysis_node)
