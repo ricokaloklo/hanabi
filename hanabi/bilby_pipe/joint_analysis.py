@@ -33,7 +33,7 @@ class SingleTriggerDataAnalysisInput(bilby_pipe.data_analysis.DataAnalysisInput)
         logger.warning(" ".join(msg))
 
 
-class JointDataAnalysisInput(object):
+class JointDataAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
         """
         Initalize multiple SingleTriggerDataAnalysisInput
@@ -186,8 +186,7 @@ class JointDataAnalysisInput(object):
             label=self.label,
             outdir=self.result_directory,
             exit_code=CHECKPOINT_EXIT_CODE,
-            **self.sampler_kwargs,
-
+            **self.sampler_kwargs
         )
 
 
