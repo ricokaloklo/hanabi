@@ -30,6 +30,29 @@ def create_joint_parser(prog, prog_version):
     )
 
     # Copied from bilby_pipe
+    # Arguments for sampler
+    sampler_parser = parser.add_argument_group(title="Sampler arguments")
+    sampler_parser.add("--sampler", type=str, default="dynesty", help="Sampler to use")
+    sampler_parser.add(
+        "--sampling-seed", default=None, type=noneint, help="Random sampling seed"
+    )
+    sampler_parser.add(
+        "--n-parallel",
+        type=int,
+        default=1,
+        help="Number of identical parallel jobs to run per event",
+    )
+    sampler_parser.add(
+        "--sampler-kwargs",
+        type=str,
+        default="Default",
+        help=(
+            "Dictionary of sampler-kwargs to pass in, e.g., {nlive: 1000} OR "
+            "pass pre-defined set of sampler-kwargs {Default, FastTest}"
+        ),
+    )
+
+    # Arguments for job submission
     submission_parser = parser.add_argument_group(
         title="Job submission arguments",
         description="How the jobs should be formatted, e.g., which job scheduler to use.",
@@ -162,6 +185,135 @@ def create_joint_parser(prog, prog_version):
         default=False,
         help="If true, format condor submission for running on OSG, default is False",
     )
+
+    # Arguments for output
+    output_parser = parser.add_argument_group(
+        title="Output arguments", description="What kind of output/summary to generate."
+    )
+    output_parser.add(
+        "--create-plots",
+        action="store_true",
+        help="Create diagnostic and posterior plots",
+    )
+    output_parser.add_argument(
+        "--plot-calibration",
+        action="store_true",
+        help="Create calibration posterior plot",
+    )
+    output_parser.add_argument(
+        "--plot-corner",
+        action="store_true",
+        help="Create intrinsic and extrinsic posterior corner plots",
+    )
+    output_parser.add_argument(
+        "--plot-marginal",
+        action="store_true",
+        help="Create 1-d marginal posterior plots",
+    )
+    output_parser.add_argument(
+        "--plot-skymap", action="store_true", help="Create posterior skymap"
+    )
+    output_parser.add_argument(
+        "--plot-waveform", action="store_true", help="Create waveform posterior plot"
+    )
+    output_parser.add_argument(
+        "--plot-format",
+        default="png",
+        help="Format for making bilby_pipe plots, can be [png, pdf, html]. "
+        "If specified format is not supported, will default to png.",
+    )
+
+    output_parser.add(
+        "--create-summary", action="store_true", help="Create a PESummary page"
+    )
+    output_parser.add("--email", type=nonestr, help="Email for notifications")
+    output_parser.add(
+        "--notification",
+        type=nonestr,
+        default="Never",
+        help=(
+            "Notification setting for HTCondor jobs. "
+            "One of 'Always','Complete','Error','Never'. "
+            "If defined by 'Always', "
+            "the owner will be notified whenever the job "
+            "produces a checkpoint, as well as when the job completes. "
+            "If defined by 'Complete', "
+            "the owner will be notified when the job terminates. "
+            "If defined by 'Error', "
+            "the owner will only be notified if the job terminates abnormally, "
+            "or if the job is placed on hold because of a failure, "
+            "and not by user request. "
+            "If defined by 'Never' (the default), "
+            "the owner will not receive e-mail, regardless to what happens to the job. "
+            "Note, an `email` arg is also required for notifications to be emailed. "
+        ),
+    )
+    output_parser.add(
+        "--existing-dir",
+        type=nonestr,
+        default=None,
+        help=(
+            "If given, add results to an directory with an an existing"
+            " summary.html file"
+        ),
+    )
+    output_parser.add(
+        "--webdir",
+        type=nonestr,
+        default=None,
+        help=(
+            "Directory to store summary pages. If not given, defaults to "
+            "outdir/results_page"
+        ),
+    )
+    output_parser.add(
+        "--summarypages-arguments",
+        type=nonestr,
+        default=None,
+        help="Arguments (in the form of a dictionary) to pass to the summarypages executable",
+    )
+
+    # Arguments for post-processing
+    postprocessing_parser = parser.add_argument_group(
+        title="Post processing arguments",
+        description="What post-processing to perform.",
+    )
+    postprocessing_parser.add(
+        "--postprocessing-executable",
+        type=nonestr,
+        default=None,
+        help=(
+            "An executable name for postprocessing. A single postprocessing "
+            " job is run as a child of all analysis jobs"
+        ),
+    )
+    postprocessing_parser.add(
+        "--postprocessing-arguments",
+        type=nonestr,
+        default=None,
+        help="Arguments to pass to the postprocessing executable",
+    )
+    postprocessing_parser.add(
+        "--single-postprocessing-executable",
+        type=nonestr,
+        default=None,
+        help=(
+            "An executable name for postprocessing. A single postprocessing "
+            "job is run as a child for each analysis jobs: note the "
+            "difference with respect postprocessing-executable"
+        ),
+    )
+    postprocessing_parser.add(
+        "--single-postprocessing-arguments",
+        type=nonestr,
+        default=None,
+        help=(
+            "Arguments to pass to the single postprocessing executable. The "
+            "str '$RESULT' will be replaced by the path to the individual "
+            "result file"
+        ),
+    )
+
 
     # Dealing with multiple inputs
     joint_input_parser = parser.add_argument_group(title="Joint input arguments", description="Specify multiple inputs")
