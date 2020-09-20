@@ -2,6 +2,7 @@
 """ Script to perform joint data analysis """
 import os
 import sys
+import signal
 import logging
 
 import numpy as np
@@ -46,6 +47,21 @@ class JointDataAnalysisInput(object):
         # Parse the lensing prior dict
         self.parse_lensing_prior_dict()
 
+        # Admin arguments
+        self.ini = args.ini
+        self.scheduler = args.scheduler
+        self.periodic_restart_time = args.periodic_restart_time
+        self.request_cpus = args.request_cpus
+
+        # Naming arguments
+        self.outdir = args.outdir
+        self.label = args.label
+
+        # Choices for running
+        self.sampler = args.sampler
+        self.sampler_kwargs = args.sampler_kwargs
+        self.sampling_seed = args.sampling_seed
+
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
         assert self.n_triggers == len(self.data_dump_files), "n_triggers does not match with the number of data dump files given"
@@ -58,6 +74,29 @@ class JointDataAnalysisInput(object):
 
         # Initialize multiple SingleTriggerDataAnalysisInput objects
         self.initialize_single_trigger_data_analysis_inputs()
+
+    @property
+    def sampling_seed(self):
+        return self._samplng_seed
+
+    @sampling_seed.setter
+    def sampling_seed(self, sampling_seed):
+        if sampling_seed is None:
+            sampling_seed = np.random.randint(1, 1e6)
+        self._samplng_seed = sampling_seed
+        np.random.seed(sampling_seed)
+        logger = logging.getLogger(__prog__)
+        logger.info(f"Sampling seed set to {sampling_seed}")
+
+        if self.sampler == "cpnest":
+            self.sampler_kwargs["seed"] = self.sampler_kwargs.get(
+                "seed", self._samplng_seed
+            )
+
+    @property
+    def result_directory(self):
+        result_dir = os.path.join(self.outdir, "result")
+        return os.path.relpath(result_dir)
 
     def initialize_single_trigger_data_analysis_inputs(self):
         self.single_trigger_data_analysis_inputs = []
@@ -134,11 +173,21 @@ class JointDataAnalysisInput(object):
         return likelihood, priors
 
     def run_sampler(self):
+        if self.scheduler.lower() == "condor":
+            signal.signal(signal.SIGALRM, handler=sighandler)
+            signal.alarm(self.periodic_restart_time)
+
         likelihood, priors = self.get_likelihood_and_priors()
 
         self.result = bilby.run_sampler(
             likelihood=likelihood,
             priors=priors,
+            sampler=self.sampler,
+            label=self.label,
+            outdir=self.result_directory,
+            exit_code=CHECKPOINT_EXIT_CODE,
+            **self.sampler_kwargs,
+
         )
 
 
