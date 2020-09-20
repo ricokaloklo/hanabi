@@ -2,7 +2,7 @@ import setuptools
 
 setuptools.setup(
     name="hanabi",
-    version="0.0.2",
+    version="0.0.3",
     author="Rico Ka Lok Lo, Ignacio Magana",
     author_email="kllo@caltech.edu",
     description="Hierarchical bayesian ANAlysis on lensed GW signals using BIlby",
