@@ -64,6 +64,7 @@ class JointAnalysisNode(Node):
             # Add path to the complete ini file for this trigger
             self.arguments.add("trigger-ini-files", str(single_trigger_pe_input.complete_ini_file))
 
+        self.arguments.add("label", str(self.label))
         self.extra_lines.extend(self._checkpoint_submit_lines())
         self.process_node()
 
