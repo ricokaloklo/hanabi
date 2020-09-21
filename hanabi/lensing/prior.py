@@ -16,15 +16,14 @@ class DiscreteUniform(bilby.core.prior.Prior):
         else:
             raise ValueError("The parameter N must be provided with a positive integer")
 
-        self.name = name
-        self.latex_label = latex_label
-        self.unit = unit
-        self.minimum = minimum
-        self.maximum = int((self.N + self.minimum) - 1)
-        self.check_range_nonzero = False
-        self.least_recently_sampled = None
-        self.boundary = None
-        self._is_fixed = False
+        super(DiscreteUniform, self).__init__(
+            name=name,
+            latex_label=latex_label,
+            unit=unit,
+            minimum=int(minimum),
+            maximum=int((self.N + minimum) - 1),
+            boundary=None
+        )
 
     def rescale(self, val):
         return np.floor(self.N*val) + self.minimum
@@ -45,6 +44,8 @@ class RelativeMagnificationPoorMan(bilby.core.prior.Prior):
         """
         RelativeMagnificationPoorMan
         ----------
+
+        Implement the poor man's prior for relative magnification
         """
         pass
 
