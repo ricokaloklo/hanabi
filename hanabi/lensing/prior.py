@@ -26,18 +26,10 @@ class DiscreteUniform(bilby.core.prior.Prior):
         )
 
     def rescale(self, val):
-        return np.floor(self.N*val) + self.minimum
+        return int(np.floor(self.N*val) + self.minimum)
     
     def prob(self, val):
-        return ((val >= self.minimum) & (val <= self.maximum))/float(self.N)
-
-    def cdf(self, val):
-        # Note that by definition CDF is *right*-continuous
-        return (val - self.minimum + 1)/float(self.N)
-
-    def ln_prob(self, val):
-        return -np.log(self.N)*np.ones_like(val)
-
+        return ((val >= self.minimum) & (val < self.maximum))/float(self.N)
 
 class RelativeMagnificationPoorMan(bilby.core.prior.Prior):
     def __init__(self):

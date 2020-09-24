@@ -6,11 +6,18 @@ import bilby.gw.likelihood
 from .images import *
 
 class LensingJointLikelihood(bilby.core.likelihood.Likelihood):
-    def __init__(self, single_trigger_likelihoods, sep_char="^", suffix=None):
+    def __init__(self, single_trigger_likelihoods, lensed_waveform_model, sep_char="^", suffix=None):
         # Initialize some variables using the default constructor
         super(LensingJointLikelihood, self).__init__(parameters={})
         self.single_trigger_likelihoods = single_trigger_likelihoods
         self.n_triggers = len(self.single_trigger_likelihoods) # Reconstruct the number of triggers
+        self.lensed_waveform_model = lensed_waveform_model
+
+        # Deep-copy the frequency domain source model for each of the single trigger
+        self.single_trigger_frequency_domain_source_models = []
+        for single_trigger_likelihood in self.single_trigger_likelihoods:
+            self.single_trigger_frequency_domain_source_models.append(copy.deepcopy(single_trigger_likelihood.waveform_generator.frequency_domain_source_model))
+
         self.sep_char = sep_char
         if suffix is None:
             self.suffix = lambda trigger_idx: "{}({})".format(self.sep_char, trigger_idx + 1)
@@ -77,23 +84,19 @@ class LensingJointLikelihood(bilby.core.likelihood.Likelihood):
         parameters_per_trigger = self.assign_trigger_level_parameters()
         logL = 0.0
 
-        for single_trigger_likelihood, single_trigger_parameters in zip(self.single_trigger_likelihoods, parameters_per_trigger):
+        for single_trigger_likelihood, single_trigger_parameters, single_trigger_frequency_domain_source_model in zip(self.single_trigger_likelihoods, parameters_per_trigger, self.single_trigger_frequency_domain_source_models):
             # Assign the single_trigger_parameters to the likelihood object for evaluation
             single_trigger_likelihood.parameters = single_trigger_parameters
-            # Set different frequency_domain_source_model according to the image type
-            image_type = int(single_trigger_likelihood.parameters.pop("image_type"))
-            if image_type == 1:
-                # Type I image
-                single_trigger_likelihood.waveform_generator.frequency_domain_source_model = lensed_BBH_type_I_image
-            elif image_type == 2:
-                # Type II image
-                single_trigger_likelihood.waveform_generator.frequency_domain_source_model = lensed_BBH_type_II_image
-            elif image_type == 3:
-                # Type III image
-                single_trigger_likelihood.waveform_generator.frequency_domain_source_model = lensed_BBH_type_III_image
-            else:
-                raise ValueError("Cannot recognize this lensed image type: {}".format(image_type))
 
+            # Set up the proper frequency_domain_source_model
+            def _frequency_domain_source_model(frequency_array, **kwargs):
+                kwargs["frequency_array"] = frequency_array
+                kwargs["frequency_domain_source_model"] = single_trigger_frequency_domain_source_model
+                return self.lensed_waveform_model(**kwargs)
+
+            single_trigger_likelihood.waveform_generator.frequency_domain_source_model = _frequency_domain_source_model
+
+            # Calculate the log likelihood
             logL += single_trigger_likelihood.log_likelihood()
 
         return logL

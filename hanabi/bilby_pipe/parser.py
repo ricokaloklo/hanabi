@@ -357,6 +357,22 @@ def create_joint_parser(prog, prog_version):
         )
     )
 
+    # Lensed waveform arguments
+    lensed_waveform_parser = parser.add_argument_group(
+        title="Waveform arguments", description="Setting for the waveform generator for lensed signals"
+    )
+
+    lensed_waveform_parser.add(
+        "--lensed-waveform-model",
+        default="strongly_lensed_BBH_waveform",
+        type=str,
+        help=(
+            "Name of the lensed waveform model. Can be one of"
+            "[strongly_lensed_BBH_waveform] or any python  path to a bilby "
+            " source function the users installation, e.g. examp.source.bbh"
+        ),
+    )
+
     return parser
 
 def print_unrecognized_arguments(unknown_args, logger):

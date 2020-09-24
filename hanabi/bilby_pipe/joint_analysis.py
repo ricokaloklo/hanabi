@@ -4,6 +4,7 @@ import os
 import sys
 import signal
 import logging
+from importlib import import_module
 
 import numpy as np
 import bilby
@@ -11,6 +12,9 @@ import bilby.core.prior
 import bilby_pipe
 import bilby_pipe.data_analysis
 from bilby_pipe.utils import CHECKPOINT_EXIT_CODE
+
+# Lensed waveform source model
+from hanabi.lensing.images import *
 
 # Lensing likelihood
 import hanabi.lensing.likelihood
@@ -44,6 +48,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         self.common_parameters = args.common_parameters
         self.lensing_prior_dict = args.lensing_prior_dict
         self.data_dump_files = args.data_dump_files
+        self.lensed_waveform_model = args.lensed_waveform_model
         # Parse the lensing prior dict
         self.parse_lensing_prior_dict()
 
@@ -74,6 +79,32 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
 
         # Initialize multiple SingleTriggerDataAnalysisInput objects
         self.initialize_single_trigger_data_analysis_inputs()
+
+    @property
+    def lensed_waveform_model(self):
+        return self._lensed_waveform_model
+
+    @lensed_waveform_model.setter
+    def lensed_waveform_model(self, lensed_waveform_model):
+        # A list of built-in lensed_waveform_model string
+        built_in_lensed_waveform_model_dict = {
+            "strongly_lensed_BBH_waveform": strongly_lensed_BBH_waveform
+        }
+
+        logger = logging.getLogger(__prog__)
+        logger.info(f"Using the lensed waveform model {lensed_waveform_model}")
+
+        if lensed_waveform_model in built_in_lensed_waveform_model_dict.keys():
+            self._lensed_waveform_model = built_in_lensed_waveform_model_dict[lensed_waveform_model]
+        elif "." in lensed_waveform_model:
+            split_model = lensed_waveform_model.split(".")
+            module = ".".join(split_model[:-1])
+            func = split_model[-1]
+            self._lensed_waveform_model = getattr(import_module(module), func)
+        else:
+            raise FileNotFoundError(
+                f"No lensed waveform model {lensed_waveform_model} found."
+            )
 
     @property
     def sampling_seed(self):
@@ -168,7 +199,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         priors = self.construct_full_prior_dict()
 
         # Construct the LensingJointLikelihood object
-        likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+        likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, self.lensed_waveform_model, sep_char=self.sep_char, suffix=self.suffix)
 
         return likelihood, priors
 
