@@ -174,13 +174,14 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         for trigger_idx, (likelihood, cbc_priors) in enumerate(zip(self.single_trigger_likelihoods, self.single_trigger_priors)):
             full_parameters = likelihood.priors.keys()
             suffix = self.suffix(trigger_idx)
-            
+
             for param in full_parameters:
                 if param not in self.common_parameters:
                     # Add indepedent parameters to the full prior dict
                     full_prior_dict[param + suffix] = likelihood.priors[param]
-                    # Rename the prior
-                    full_prior_dict[param + suffix].name = full_prior_dict[param + suffix].name + suffix
+                    # Rename the prior if there is a name for it
+                    if full_prior_dict[param + suffix].name is not None:
+                        full_prior_dict[param + suffix].name = full_prior_dict[param + suffix].name + suffix
                 if param in self.common_parameters:
                     if param in full_prior_dict.keys():
                         # Already added to the full prior dict, check consistency
