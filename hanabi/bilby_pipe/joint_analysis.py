@@ -14,7 +14,7 @@ import bilby_pipe.data_analysis
 from bilby_pipe.utils import CHECKPOINT_EXIT_CODE
 
 # Lensed waveform source model
-from hanabi.lensing.images import *
+from hanabi.lensing.waveforms import *
 
 # Lensing likelihood
 import hanabi.lensing.likelihood

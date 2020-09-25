@@ -3,7 +3,7 @@ import copy
 import bilby.core.likelihood
 import bilby.gw.conversion
 import bilby.gw.likelihood
-from .images import *
+from .waveforms import *
 
 class LensingJointLikelihood(bilby.core.likelihood.Likelihood):
     def __init__(self, single_trigger_likelihoods, lensed_waveform_model, sep_char="^", suffix=None):
@@ -13,10 +13,9 @@ class LensingJointLikelihood(bilby.core.likelihood.Likelihood):
         self.n_triggers = len(self.single_trigger_likelihoods) # Reconstruct the number of triggers
         self.lensed_waveform_model = lensed_waveform_model
 
-        # Deep-copy the frequency domain source model for each of the single trigger
-        self.single_trigger_frequency_domain_source_models = []
+        # Assign the lensed waveform model specified to the single-trigger likelihoods
         for single_trigger_likelihood in self.single_trigger_likelihoods:
-            self.single_trigger_frequency_domain_source_models.append(copy.deepcopy(single_trigger_likelihood.waveform_generator.frequency_domain_source_model))
+            single_trigger_likelihood.waveform_generator.frequency_domain_source_model = self.lensed_waveform_model
 
         self.sep_char = sep_char
         if suffix is None:
@@ -84,17 +83,9 @@ class LensingJointLikelihood(bilby.core.likelihood.Likelihood):
         parameters_per_trigger = self.assign_trigger_level_parameters()
         logL = 0.0
 
-        for single_trigger_likelihood, single_trigger_parameters, single_trigger_frequency_domain_source_model in zip(self.single_trigger_likelihoods, parameters_per_trigger, self.single_trigger_frequency_domain_source_models):
+        for single_trigger_likelihood, single_trigger_parameters in zip(self.single_trigger_likelihoods, parameters_per_trigger):
             # Assign the single_trigger_parameters to the likelihood object for evaluation
             single_trigger_likelihood.parameters = single_trigger_parameters
-
-            # Set up the proper frequency_domain_source_model
-            def _frequency_domain_source_model(frequency_array, **kwargs):
-                kwargs["frequency_array"] = frequency_array
-                kwargs["frequency_domain_source_model"] = single_trigger_frequency_domain_source_model
-                return self.lensed_waveform_model(**kwargs)
-
-            single_trigger_likelihood.waveform_generator.frequency_domain_source_model = _frequency_domain_source_model
 
             # Calculate the log likelihood
             logL += single_trigger_likelihood.log_likelihood()
