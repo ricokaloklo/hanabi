@@ -48,7 +48,17 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         self.common_parameters = args.common_parameters
         self.lensing_prior_dict = args.lensing_prior_dict
         self.data_dump_files = args.data_dump_files
+
+        # Lensed waveform
         self.lensed_waveform_model = args.lensed_waveform_model
+        self.waveform_approximant = args.waveform_approximant
+        self.catch_waveform_errors = args.catch_waveform_errors
+        self.pn_spin_order = args.pn_spin_order
+        self.pn_tidal_order = args.pn_tidal_order
+        self.pn_phase_order = args.pn_phase_order
+        self.pn_amplitude_order = args.pn_amplitude_order
+        self.mode_array = args.mode_array
+
         # Parse the lensing prior dict
         self.parse_lensing_prior_dict()
 

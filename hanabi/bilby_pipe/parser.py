@@ -361,7 +361,6 @@ def create_joint_parser(prog, prog_version):
     lensed_waveform_parser = parser.add_argument_group(
         title="Waveform arguments", description="Setting for the waveform generator for lensed signals"
     )
-
     lensed_waveform_parser.add(
         "--lensed-waveform-model",
         default="strongly_lensed_BBH_waveform",
@@ -371,6 +370,54 @@ def create_joint_parser(prog, prog_version):
             "[strongly_lensed_BBH_waveform] or any python  path to a bilby "
             " source function the users installation, e.g. examp.source.bbh"
         ),
+    )
+    lensed_waveform_parser.add(
+        "--reference-frequency", default=20, type=float, help="The reference frequency"
+    )
+    lensed_waveform_parser.add(
+        "--waveform-approximant",
+        default="IMRPhenomPv2",
+        type=str,
+        help="The name of the waveform approximant to use for PE.",
+    )
+    lensed_waveform_parser.add(
+        "--catch-waveform-errors",
+        default=False,
+        action=StoreBoolean,
+        help="Turns on waveform error catching",
+    )
+    lensed_waveform_parser.add(
+        "--pn-spin-order",
+        default=-1,
+        type=int,
+        help="Post-newtonian order to use for the spin",
+    )
+    lensed_waveform_parser.add(
+        "--pn-tidal-order",
+        default=-1,
+        type=int,
+        help="Post-Newtonian order to use for tides",
+    )
+    lensed_waveform_parser.add(
+        "--pn-phase-order",
+        default=-1,
+        type=int,
+        help="post-Newtonian order to use for the phase",
+    )
+    lensed_waveform_parser.add(
+        "--pn-amplitude-order",
+        default=0,
+        type=int,
+        help="Post-Newtonian order to use for the amplitude. Also "
+        "used to determine the waveform starting frequency.",
+    )
+    lensed_waveform_parser.add(
+        "--mode-array",
+        default=None,
+        type=nonestr,
+        action="append",
+        help="Array of modes to use for the waveform. Should be "
+        "a list of lists, eg. [[2,2], [2,-2]]",
     )
 
     return parser
