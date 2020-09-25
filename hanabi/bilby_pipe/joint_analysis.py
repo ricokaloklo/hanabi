@@ -107,6 +107,17 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             )
 
     @property
+    def common_parameters(self):
+        return self._common_parameters
+
+    @common_parameters.setter
+    def common_parameters(self, common_parameters):
+        if common_parameters is not None:
+            self._common_parameters = common_parameters
+        else:
+            self._common_parameters = []
+
+    @property
     def sampling_seed(self):
         return self._samplng_seed
 
