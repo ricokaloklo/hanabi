@@ -28,6 +28,7 @@ class JointMainInput(bilby_pipe.input.Input):
         self.trigger_ini_files = args.trigger_ini_files
         self.common_parameters = args.common_parameters
         self.lensing_prior_dict = args.lensing_prior_dict
+        self.lensed_waveform_model = args.lensed_waveform_model
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
