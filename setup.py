@@ -21,6 +21,10 @@ setuptools.setup(
             "hanabi_joint_analysis=hanabi.bilby_pipe.joint_analysis:main"
         ]
     },
+    install_requires=[
+        "bilby=1.0.2",
+        "bilby_pipe=1.0.1"
+    ]
     classifiers=[
         "Programming Language :: Python :: 3.6",
         "Programming Language :: Python :: 3.7",
