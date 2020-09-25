@@ -22,8 +22,8 @@ setuptools.setup(
         ]
     },
     install_requires=[
-        "bilby=1.0.2",
-        "bilby_pipe=1.0.1"
+        "bilby==1.0.2",
+        "bilby_pipe==1.0.1"
     ],
     classifiers=[
         "Programming Language :: Python :: 3.6",
