@@ -179,9 +179,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
                 if param not in self.common_parameters:
                     # Add indepedent parameters to the full prior dict
                     full_prior_dict[param + suffix] = likelihood.priors[param]
-                    # Rename the prior if there is a name for it
-                    if full_prior_dict[param + suffix].name is not None:
-                        full_prior_dict[param + suffix].name = full_prior_dict[param + suffix].name + suffix
+                    # FIXME Not bother to change the name
                 if param in self.common_parameters:
                     if param in full_prior_dict.keys():
                         # Already added to the full prior dict, check consistency
