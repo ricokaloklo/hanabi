@@ -12,7 +12,6 @@ setuptools.setup(
         "hanabi",
         "hanabi.lensing",
         "hanabi.bilby_pipe",
-        "hanabi.parallel_bilby",
         "hanabi.hierarchical"
     ],
     entry_points={
