@@ -26,7 +26,7 @@ class DiscreteUniform(bilby.core.prior.Prior):
         )
 
     def rescale(self, val):
-        return int(np.floor(self.N*val) + self.minimum)
+        return np.floor(self.N*val) + self.minimum
     
     def prob(self, val):
         return ((val >= self.minimum) & (val < self.maximum))/float(self.N)
