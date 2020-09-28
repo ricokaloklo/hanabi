@@ -17,7 +17,7 @@ class JointAnalysisNode(Node):
 
         self.analysis_prog_name = "hanabi_joint_analysis"
 
-        self.base_job_name = self.analysis_prog_name
+        self.base_job_name = "{}_{}".format(self.joint_main_input.label, self.analysis_prog_name)
         if parallel_idx != "":
             self.job_name = f"{self.base_job_name}_{parallel_idx}"
         else:
