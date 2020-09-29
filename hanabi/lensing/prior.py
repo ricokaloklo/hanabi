@@ -29,10 +29,10 @@ class DiscreteUniform(bilby.core.prior.Prior):
         return np.floor(self.N*val) + self.minimum
     
     def prob(self, val):
-        return ((val >= self.minimum) & (val <= self.maximum))/float(self.N)
+        return ((val >= self.minimum) & (val <= self.maximum))/float(self.N) * (np.modf(val)[0] == 0).astype(int)
 
     def cdf(self, val):
-        return (np.floor(val) - self.minimum + 1)/float(self.N)
+        return (np.floor(val) - self.minimum + 1)/float(self.N) + (val > self.maximum)*(1 - (np.floor(val) - self.minimum + 1)/float(self.N))
 
 class RelativeMagnificationPoorMan(bilby.core.prior.Prior):
     def __init__(self):
