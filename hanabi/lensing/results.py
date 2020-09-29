@@ -1,2 +1,0 @@
-class JointResults(object):
-    pass
