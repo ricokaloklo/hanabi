@@ -3,7 +3,7 @@ import copy
 import bilby.core.likelihood
 import bilby.gw.conversion
 import bilby.gw.likelihood
-from .waveforms import *
+from .waveform import *
 
 class LensingJointLikelihood(bilby.core.likelihood.Likelihood):
     def __init__(self, single_trigger_likelihoods, lensed_waveform_model, sep_char="^", suffix=None):
