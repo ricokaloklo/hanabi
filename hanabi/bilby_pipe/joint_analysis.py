@@ -3,6 +3,7 @@
 import os
 import sys
 import signal
+import copy
 import logging
 from importlib import import_module
 
@@ -230,6 +231,15 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             **self.sampler_kwargs
         )
 
+    def construct_individual_result_for_triggers(self):
+        # NOTE Doing this may potentially be dangereous and misleading
+        for trigger_idx in range(self.n_triggers):
+            # Make a (deep-)copy of the result
+            individual_result = copy.deepcopy(self.result)
+
+            # Purge unrelated parameters
+            pass
+        
 
 def create_joint_analysis_parser():
     parser = create_joint_parser(__prog__, __version__)
