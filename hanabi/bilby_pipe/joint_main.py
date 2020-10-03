@@ -29,6 +29,7 @@ class JointMainInput(bilby_pipe.input.Input):
         self.common_parameters = args.common_parameters
         self.lensing_prior_dict = args.lensing_prior_dict
         self.lensed_waveform_model = args.lensed_waveform_model
+        self.retry_for_data_generation = args.retry_for_data_generation
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
@@ -96,10 +97,7 @@ class JointMainInput(bilby_pipe.input.Input):
         self.requirements = []
 
         # Turn off automatic submission
-        if self.submit:
-            logger = logging.getLogger(__prog__)
-            logger.info(f"Turning off automatic submission")
-            self.submit = False
+        turn_off_forbidden_option(self, "submit")
 
     # The following lines of code are also modified from bilby_pipe
     @property
@@ -162,6 +160,10 @@ def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
         args, unknown_args = bilby_pipe.utils.parse_args([trigger_ini_file], bilby_pipe_parser)
         main_input = bilby_pipe.main.MainInput(args, unknown_args)
 
+        turn_off_forbidden_option(main_input, "submission")
+        turn_off_forbidden_option(main_input, "distance_marginalization")
+        turn_off_forbidden_option(main_input, "phase_marginalization")
+
         if write_dag:
             bilby_pipe.main.write_complete_config_file(bilby_pipe_parser, args, main_input)
             bilby_pipe.main.generate_dag(main_input)
@@ -169,6 +171,13 @@ def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
         single_trigger_pe_inputs.append(main_input)
 
     return single_trigger_pe_inputs
+
+def turn_off_forbidden_option(input, forbidden_option):
+    # NOTE Only support boolean option
+    if getattr(input, forbidden_option, False):
+        logger = logging.getLogger(__prog__)
+        logger.info(f"Turning off {forbidden_option}")
+        setattr(input, forbidden_option, False)
 
 def generate_dag(joint_main_input, single_trigger_pe_inputs):
     dag = Dag(joint_main_input)
