@@ -1,9 +1,11 @@
 #!/usr/bin/env python
 """ Script to perform joint data analysis """
 import os
+import os.path
 import sys
 import signal
 import copy
+import time
 import logging
 from importlib import import_module
 
@@ -50,6 +52,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         self.lensing_prior_dict = args.lensing_prior_dict
         self.data_dump_files = args.data_dump_files
         self.lensed_waveform_model = args.lensed_waveform_model
+        self.retry_for_data_generation = args.retry_for_data_generation
         # Parse the lensing prior dict
         self.parse_lensing_prior_dict()
 
@@ -260,5 +263,15 @@ def create_joint_analysis_parser():
 def main():
     args, unknown_args = bilby_pipe.utils.parse_args(sys.argv[1:], create_joint_analysis_parser())
     analysis = JointDataAnalysisInput(args, unknown_args)
+    
+    if analysis.retry_for_data_generation > 0:
+        while True:
+            # Check if the specified data dump files exist or not
+            if all([os.path.exists(data_dump_file) for data_dump_file in analysis.data_dump_files]):
+                break
+            else:
+                # Sleep and wait
+                time.sleep(analysis.retry_for_data_generation * 60.0)
+
     analysis.run_sampler()
     sys.exit(0)

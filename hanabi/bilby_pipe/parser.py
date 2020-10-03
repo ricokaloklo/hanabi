@@ -314,6 +314,16 @@ def create_joint_parser(prog, prog_version):
         ),
     )
 
+    # Make hanabi_joint_analysis to retry for the data generation jobs to complete
+    submission_parser.add(
+        "--retry-for-data-generation",
+        type=int,
+        default=0,
+        help=(
+            "Retry an analysis node every N minute to wait for the data generation jobs"
+            "from single trigger to complete. Default is to not retry"
+        )
+    )
 
     # Dealing with multiple inputs
     joint_input_parser = parser.add_argument_group(title="Joint input arguments", description="Specify multiple inputs")
