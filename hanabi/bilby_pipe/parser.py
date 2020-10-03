@@ -96,8 +96,8 @@ def create_joint_parser(prog, prog_version):
     submission_parser.add(
         "--request-memory",
         type=float,
-        default=4.0,
-        help="Memory allocation request (GB), defaults is 4GB",
+        default=8.0,
+        help="Memory allocation request (GB), defaults is 8GB",
     )
     submission_parser.add(
         "--request-memory-generation",
@@ -164,9 +164,9 @@ def create_joint_parser(prog, prog_version):
     submission_parser.add(
         "--transfer-files",
         action=StoreBoolean,
-        default=True,
+        default=False,
         help=(
-            "If true, use HTCondor file transfer mechanism, default is True"
+            "If true, use HTCondor file transfer mechanism, default is False"
             "for non-condor schedulers, this option is ignored"
         ),
     )
