@@ -81,6 +81,17 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         self.sep_char = "^"
         self.suffix = lambda trigger_idx: "{}({})".format(self.sep_char, trigger_idx + 1)
 
+        if self.retry_for_data_generation > 0:
+            while True:
+                # Check if the specified data dump files exist or not
+                if all([os.path.exists(data_dump_file) for data_dump_file in self.data_dump_files]):
+                    break
+                else:
+                    # Sleep and wait
+                    logger = logging.getLogger(__prog__)
+                    logger.info(f"Cannot find all the necessary data dump files. Sleeping for {self.retry_for_data_generation} minutes")
+                    time.sleep(self.retry_for_data_generation * 60.0)
+
         # Initialize multiple SingleTriggerDataAnalysisInput objects
         self.initialize_single_trigger_data_analysis_inputs()
 
@@ -263,17 +274,5 @@ def create_joint_analysis_parser():
 def main():
     args, unknown_args = bilby_pipe.utils.parse_args(sys.argv[1:], create_joint_analysis_parser())
     analysis = JointDataAnalysisInput(args, unknown_args)
-    
-    if analysis.retry_for_data_generation > 0:
-        while True:
-            # Check if the specified data dump files exist or not
-            if all([os.path.exists(data_dump_file) for data_dump_file in analysis.data_dump_files]):
-                break
-            else:
-                # Sleep and wait
-                logger = logging.getLogger(__prog__)
-                logger.info(f"Cannot find all the necessary data dump files. Sleeping for {analysis.retry_for_data_generation} minutes")
-                time.sleep(analysis.retry_for_data_generation * 60.0)
-
     analysis.run_sampler()
     sys.exit(0)
