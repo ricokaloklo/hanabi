@@ -161,8 +161,9 @@ def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
         main_input = bilby_pipe.main.MainInput(args, unknown_args)
 
         turn_off_forbidden_option(main_input, "submit")
-        turn_off_forbidden_option(main_input, "distance_marginalization")
-        turn_off_forbidden_option(main_input, "phase_marginalization")
+        turn_off_forbidden_option(args, "submit")
+        turn_off_forbidden_option(args, "distance_marginalization")
+        turn_off_forbidden_option(args, "phase_marginalization")
 
         if write_dag:
             bilby_pipe.main.write_complete_config_file(bilby_pipe_parser, args, main_input)
