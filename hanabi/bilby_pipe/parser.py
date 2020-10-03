@@ -121,7 +121,7 @@ def create_joint_parser(prog, prog_version):
         "--scheduler",
         type=str,
         default="condor",
-        help="Format submission script for specified scheduler. Currently implemented: SLURM",
+        help="Format submission script for specified scheduler. Currently implemented: condor, slurm",
     )
     submission_parser.add(
         "--scheduler-args",
