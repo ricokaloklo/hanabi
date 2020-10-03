@@ -271,6 +271,8 @@ def main():
                 break
             else:
                 # Sleep and wait
+                logger = logging.getLogger(__prog__)
+                logger.info(f"Cannot find all the necessary data dump files. Sleeping for {analysis.retry_for_data_generation} minutes")
                 time.sleep(analysis.retry_for_data_generation * 60.0)
 
     analysis.run_sampler()
