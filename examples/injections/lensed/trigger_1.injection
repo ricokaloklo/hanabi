@@ -1,16 +1,2 @@
-mass_1 = 32.0
-mass_2 = 40.0
-a_1 = 0.0
-a_2 = 0.0
-tilt_1 = 0.0
-tilt_2 = 0.0
-phi_12 = 0.0
-phi_jl = 0.0
-luminosity_distance =  780
-dec = 0.43
-ra = 3.2
-theta_jn = 0.0
-psi = 0.0
-phase = 0.0
-geocent_time = 0.0
-image_type = 1.0
+mass_1 mass_2 a_1 a_2 tilt_1 tilt_2 phi_12 phi_jl luminosity_distance dec ra theta_jn psi phase geocent_time image_type
+32.0 40.0 0.0 0.0 0.0 0.0 0.0 0.0 780.0 0.43 3.2 0.0 0.0 0.0 0.0 1.0
