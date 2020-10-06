@@ -59,7 +59,6 @@ class RelativeMagnificationPoorMan(bilby.core.prior.Prior):
         )
 
     def rescale(self, val):
-        # Using generic inverse CDF method
         return ((0 <= val) & (val < 0.5)) * np.sqrt(val/(self.norm*0.5)) + ((0.5 <= val) & (val < 1)) * np.sqrt(0.5/(1.0 - val/self.norm))
 
     def prob(self, val):
