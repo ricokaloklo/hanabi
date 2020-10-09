@@ -226,6 +226,7 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
         )
         merged_node_list.append(merge_node)
 
+    """
     # PlotNode
     plot_nodes_list = []
     for merged_node in merged_node_list:
@@ -238,7 +239,7 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
         PESummaryNode(joint_main_input, merged_node_list, generation_node_list, dag=dag)
     if joint_main_input.postprocessing_executable is not None:
         PostProcessAllResultsNode(joint_main_input, merged_node_list, dag)
-
+    """
     dag.build()
 
 def write_complete_config_file(parser, args, inputs):

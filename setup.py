@@ -11,13 +11,13 @@ setuptools.setup(
     packages=[
         "hanabi",
         "hanabi.lensing",
-        "hanabi.bilby_pipe",
+        "hanabi.inference",
         "hanabi.hierarchical"
     ],
     entry_points={
         "console_scripts": [
-            "hanabi_joint_pipe=hanabi.bilby_pipe.joint_main:main",
-            "hanabi_joint_analysis=hanabi.bilby_pipe.joint_analysis:main"
+            "hanabi_joint_pipe=hanabi.inference.joint_main:main",
+            "hanabi_joint_analysis=hanabi.inference.joint_analysis:main"
         ]
     },
     install_requires=[
