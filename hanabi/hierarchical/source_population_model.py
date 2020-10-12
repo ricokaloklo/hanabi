@@ -31,7 +31,7 @@ class SourcePopulationPrior(object):
     def ln_prob(self, dataset):
         return np.log(self.prob(dataset))
 
-# Wrappers for gwpopulation's power_law_primary_mass_ratio
+# Wrapper for gwpopulation's power_law_primary_mass_ratio
 class PowerLawPrimaryMassRatio(SourcePopulationPrior):
     def __init__(self, alpha, beta, mmin, mmax):
         super(PowerLawPrimaryMassRatio, self).__init__(
