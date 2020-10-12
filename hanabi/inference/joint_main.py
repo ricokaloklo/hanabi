@@ -98,6 +98,10 @@ class JointMainInput(bilby_pipe.input.Input):
 
         # Turn off automatic submission
         turn_off_forbidden_option(self, "submit")
+        # NOTE We don't support PostProcessSingleResultsNode for now, we will support this later
+        turn_off_forbidden_option(self, "single_postprocessing_executable")
+        # NOTE For now we don't support plotting, we will support this later
+        turn_off_forbidden_option(self, "create_plots")
 
     # The following lines of code are also modified from bilby_pipe
     @property
@@ -226,7 +230,6 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
         )
         merged_node_list.append(merge_node)
 
-    # NOTE: For now we don't support plotting
     # Support PESummaryNode
     if joint_main_input.create_summary:
         PESummaryNode(joint_main_input, merged_node_list, generation_node_list, dag=dag)
