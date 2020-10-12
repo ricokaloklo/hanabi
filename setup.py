@@ -29,7 +29,8 @@ setuptools.setup(
     entry_points={
         "console_scripts": [
             "hanabi_joint_pipe=hanabi.inference.joint_main:main",
-            "hanabi_joint_analysis=hanabi.inference.joint_analysis:main"
+            "hanabi_joint_analysis=hanabi.inference.joint_analysis:main",
+            "hanabi_postprocess_result=hanabi.inference.postprocessing:main"
         ]
     },
     install_requires=[
