@@ -24,7 +24,7 @@ import hanabi.lensing.likelihood
 from .utils import setup_logger
 from .parser import create_joint_parser
 
-from ._version import __version__
+from .._version import __version__
 __prog__ = "hanabi_joint_analysis"
 
 def sighandler(signum, frame):

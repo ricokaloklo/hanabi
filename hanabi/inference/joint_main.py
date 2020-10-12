@@ -15,7 +15,7 @@ import bilby_pipe.utils
 from .utils import setup_logger
 
 from .parser import create_joint_parser, print_unrecognized_arguments
-from ._version import __version__
+from .._version import __version__
 
 __prog__ = "hanabi_joint_pipe"
 
