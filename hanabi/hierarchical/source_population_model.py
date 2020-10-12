@@ -94,8 +94,8 @@ class PowerLawRedshift(SourcePopulationPrior):
             dataset=dataset, lamb=self.population_parameter_dict["kappa"]
         )
 
-    def total_number_of_expected_mergers(self, R0, T_obs):
-        # R0 is in the unit of Gpc^-3 T_obs^-1
+    def total_number_of_expected_mergers(self, R_0, T_obs):
+        # R_0 is in the unit of Gpc^-3 T_obs^-1
         # Since astropy.cosmology is using Mpc as the default unit
-        return R0 / 1e9 * T_obs * \
+        return R_0 / 1e9 * T_obs * \
             self._PowerLawRedshift.normalisation(parameters={'lamb': self.population_parameter_dict["kappa"]})
