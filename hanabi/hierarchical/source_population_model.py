@@ -7,8 +7,9 @@ class SourcePopulationPrior(object):
         self.signal_parameter_names = signal_parameter_names
         self.population_parameter_dict = population_parameter_dict
 
-    def _check_if_keys_exist(self, dataset):
-        if all([name in dataset.keys() for name in self.signal_parameter_names]):
+    @staticmethod
+    def _check_if_keys_exist(names, keys):
+        if all([name in keys for name in names]):
             return True
         else:
             return False
@@ -18,7 +19,7 @@ class SourcePopulationPrior(object):
         return dataset
 
     def prob(self, dataset):
-        if not self._check_if_keys_exist(dataset):
+        if not self._check_if_keys_exist(names=self.signal_parameter_names, keys=dataset.keys()):
             # Parameters needed for evaluation does not exist
             self._parameter_conversion(dataset)
 
@@ -45,6 +46,15 @@ class PowerLawPrimaryMassRatio(SourcePopulationPrior):
                 'mmax': mmax
             }
         )
+
+    def _parameter_conversion(self, dataset):
+        if self._check_if_keys_exist(names=["mass_1", "mass_2"], keys=dataset.keys()):
+            # Convert mass_1, mass_2 to mass_1, mass_ratio
+            mass_ratio = bilby.gw.conversion.component_masses_to_mass_ratio(
+                mass_1=dataset["mass_1"],
+                mass_2=dataset["mass_2"]
+            )
+            dataset["mass_ratio"] = mass_ratio
 
     def _prob(self, dataset):
         return gwpopulation.models.mass.power_law_primary_mass_ratio(
