@@ -6,7 +6,7 @@ import bilby_pipe
 import bilby_pipe.main
 from bilby_pipe.job_creation.bilby_pipe_dag_creator import get_parallel_list, create_overview
 from bilby_pipe.job_creation.dag import Dag
-from bilby_pipe.job_creation.nodes import MergeNode, PESummaryNode, PostProcessAllResultsNode
+from bilby_pipe.job_creation.nodes import MergeNode, PESummaryNode, PostProcessSingleResultsNode
 from .analysis_node import JointAnalysisNode
 
 # NOTE Importing the following will initialize a logger for bilby_pipe
@@ -98,8 +98,8 @@ class JointMainInput(bilby_pipe.input.Input):
 
         # Turn off automatic submission
         turn_off_forbidden_option(self, "submit")
-        # NOTE We don't support PostProcessSingleResultsNode for now, we will support this later
-        turn_off_forbidden_option(self, "single_postprocessing_executable")
+        # NOTE We don't support PostProcessAllResultsNode for now, we will support this later
+        turn_off_forbidden_option(self, "postprocessing_executable")
         # NOTE For now we don't support plotting, we will support this later
         turn_off_forbidden_option(self, "create_plots")
 
@@ -233,9 +233,11 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
     # Support PESummaryNode
     if joint_main_input.create_summary:
         PESummaryNode(joint_main_input, merged_node_list, generation_node_list, dag=dag)
-    # Support PostProcessAllResultsNode
-    if joint_main_input.postprocessing_executable is not None:
-        PostProcessAllResultsNode(joint_main_input, merged_node_list, dag)
+
+    for merged_node in merged_node_list:
+        if joint_main_input.single_postprocessing_executable
+            # Support PostProcessSingleResultsNode
+            PostProcessSingleResultsNode(joint_main_input, merged_node, dag=dag)
 
     dag.build()
 

@@ -296,7 +296,7 @@ def create_joint_parser(prog, prog_version):
     postprocessing_parser.add(
         "--single-postprocessing-executable",
         type=nonestr,
-        default=None,
+        default="hanabi_postprocess_result",
         help=(
             "An executable name for postprocessing. A single postprocessing "
             "job is run as a child for each analysis jobs: note the "
@@ -306,7 +306,7 @@ def create_joint_parser(prog, prog_version):
     postprocessing_parser.add(
         "--single-postprocessing-arguments",
         type=nonestr,
-        default=None,
+        default="--flat-in-component-masses --uniform-in-comoving-volume $RESULT",
         help=(
             "Arguments to pass to the single postprocessing executable. The "
             "str '$RESULT' will be replaced by the path to the individual "
