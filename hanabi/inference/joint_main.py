@@ -235,7 +235,7 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
         PESummaryNode(joint_main_input, merged_node_list, generation_node_list, dag=dag)
 
     for merged_node in merged_node_list:
-        if joint_main_input.single_postprocessing_executable
+        if joint_main_input.single_postprocessing_executable:
             # Support PostProcessSingleResultsNode
             PostProcessSingleResultsNode(joint_main_input, merged_node, dag=dag)
 
