@@ -31,12 +31,24 @@ class SourcePopulationPrior(object):
     def ln_prob(self, dataset):
         return np.log(self.prob(dataset))
 
+
+class Marginalized(SourcePopulationPrior):
+    def __init__(self):
+        super(Marginalized, self).__init__([], {})
+
+    def _check_if_keys_exist(names, keys):
+        return True
+
+    def prob(self, dataset):
+        return 1.0
+
+
 # Wrapper for gwpopulation's power_law_primary_mass_ratio
 class PowerLawPrimaryMassRatio(SourcePopulationPrior):
     def __init__(self, alpha, beta, mmin, mmax):
         super(PowerLawPrimaryMassRatio, self).__init__(
             signal_parameter_names=[
-                'mass_1',
+                'mass_1_source',
                 'mass_ratio'
             ],
             population_parameter_dict={
@@ -94,7 +106,6 @@ class PowerLawRedshift(SourcePopulationPrior):
                 dataset["comoving_distance"]
             )
         else:
-            # Don't know do what (Ng, 2019)
             raise ValueError("No distance measure in dataset")
 
         dataset["redshift"] = redshift
