@@ -40,8 +40,13 @@ class Marginalized(SourcePopulationPrior):
         return True
 
     def prob(self, dataset):
-        return np.ones_like(dataset)
+        return 1.0
 
+
+class MarginalizedMergerRateDensity(Marginalized):
+    def total_number_of_expected_mergers(self, R_0, T_obs):
+        return 1.0
+ 
 
 # Wrapper for gwpopulation's power_law_primary_mass_ratio
 class PowerLawPrimaryMassRatio(SourcePopulationPrior):
@@ -70,7 +75,7 @@ class PowerLawPrimaryMassRatio(SourcePopulationPrior):
 
     def _prob(self, dataset):
         return gwpopulation.models.mass.power_law_primary_mass_ratio(
-            dataset,
+            {"mass_1": dataset["mass_1_source"], "mass_ratio": dataset["mass_ratio"]},
             self.population_parameter_dict["alpha"],
             self.population_parameter_dict["beta"],
             self.population_parameter_dict["mmin"],
@@ -79,12 +84,13 @@ class PowerLawPrimaryMassRatio(SourcePopulationPrior):
 
 # Wrapper for gwpopulation's PowerLawRedshift
 class PowerLawRedshift(SourcePopulationPrior):
-    def __init__(self, kappa, redshift_max=2.3):
+    def __init__(self, R_0, kappa, redshift_max=2.3):
         super(PowerLawRedshift, self).__init__(
             signal_parameter_names=[
                 "redshift"
             ],
             population_parameter_dict={
+                'R_0': R_0,
                 'kappa': kappa,
                 'redshift_max': redshift_max
             }
@@ -111,12 +117,12 @@ class PowerLawRedshift(SourcePopulationPrior):
         dataset["redshift"] = redshift
 
     def _prob(self, dataset):
-        return self._PowerLawRedshift.probability(
+        return np.log(self.population_parameter_dict["R_0"]) + self._PowerLawRedshift.probability(
             dataset=dataset, lamb=self.population_parameter_dict["kappa"]
         )
 
-    def total_number_of_expected_mergers(self, R_0, T_obs):
+    def total_number_of_expected_mergers(self, T_obs):
         # R_0 is in the unit of Gpc^-3 T_obs^-1
         # Since astropy.cosmology is using Mpc as the default unit
-        return R_0 / 1e9 * T_obs * \
+        return self.population_parameter_dict["R_0"] / 1e9 * T_obs * \
             self._PowerLawRedshift.normalisation(parameters={'lamb': self.population_parameter_dict["kappa"]})
