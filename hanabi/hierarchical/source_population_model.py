@@ -60,11 +60,11 @@ class PowerLawPrimaryMassRatio(SourcePopulationPrior):
         )
 
     def _parameter_conversion(self, dataset):
-        if self._check_if_keys_exist(names=["mass_1", "mass_2"], keys=dataset.keys()):
+        if self._check_if_keys_exist(names=["mass_1_source", "mass_2_source"], keys=dataset.keys()):
             # Convert mass_1, mass_2 to mass_1, mass_ratio
             mass_ratio = bilby.gw.conversion.component_masses_to_mass_ratio(
-                mass_1=dataset["mass_1"],
-                mass_2=dataset["mass_2"]
+                mass_1=dataset["mass_1_source"],
+                mass_2=dataset["mass_2_source"]
             )
             dataset["mass_ratio"] = mass_ratio
 
