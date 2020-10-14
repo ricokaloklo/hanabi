@@ -40,7 +40,7 @@ class Marginalized(SourcePopulationPrior):
         return True
 
     def prob(self, dataset):
-        return 1.0
+        return np.ones_like(dataset)
 
 
 # Wrapper for gwpopulation's power_law_primary_mass_ratio
