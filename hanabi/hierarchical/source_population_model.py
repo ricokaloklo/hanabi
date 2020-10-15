@@ -82,6 +82,20 @@ class PowerLawPrimaryMassRatio(SourcePopulationPrior):
             self.population_parameter_dict["mmax"]
         )
 
+class UniformAlignedSpinComponent(SourcePopulationPrior):
+    def __init__(self):
+        super(UniformAlignedSpinComponent, self).__init__(
+            signal_parameter_names=[
+                'spin_1z',
+                'spin_2z'
+            ],
+            population_parameter_dict={}
+        )
+
+    def prob(self, dataset):
+        # z component from [-1, 1]
+        return 0.25
+
 # Wrapper for gwpopulation's PowerLawRedshift
 class PowerLawRedshift(SourcePopulationPrior):
     def __init__(self, R_0, kappa, redshift_max=2.3):
