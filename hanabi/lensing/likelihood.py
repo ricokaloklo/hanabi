@@ -93,7 +93,6 @@ class LensingJointLikelihood(JointLikelihood):
                     relative_magnification = trigger_parameters.pop("relative_magnification")
                     trigger_parameters["luminosity_distance"] = trigger_parameters["luminosity_distance"]/(np.sqrt(relative_magnification))
                     # NOTE We cannot get the source redshift here!
-
                 elif "absolute_magnification" in trigger_parameters.keys():
                     # Overwrite the luminosity distance here to the apparent luminosity distance
                     absolute_magnification = trigger_parameters.pop("absolute_magnification")
@@ -102,7 +101,6 @@ class LensingJointLikelihood(JointLikelihood):
                     trigger_parameters["redshift"] = bilby.gw.conversion.luminosity_distance_to_redshift(source_luminosity_distance)
 
                     trigger_parameters["luminosity_distance"] = source_luminosity_distance/np.sqrt(absolute_magnification)
-
             elif "redshift" in common_parameters:
                 if "relative_magnification" in trigger_parameters.keys():
                     raise NotImplementedError("Sampling in redshift requires absolute magnification. Sample in luminosity distance instead if you want to use relative magnification")
@@ -112,5 +110,7 @@ class LensingJointLikelihood(JointLikelihood):
                     # Overwrite the luminosity distance here to the apparent luminosity distance
                     absolute_magnification = trigger_parameters.pop("absolute_magnification")
                     trigger_parameters["luminosity_distance"] = source_luminosity_distance/np.sqrt(absolute_magnification)
-        
+            elif "comoving_distance" in common_parameters:
+                raise NotImplementedError("Currently do not support sampling in comoving distance")
+
         return parameters_per_trigger
