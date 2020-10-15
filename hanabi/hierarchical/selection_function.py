@@ -19,7 +19,7 @@ class SelectionFunction(object):
         return 1.0
 
     def evaluate(self, T_obs, IFAR_threshold=1):
-        N_tot = self.merger_rate_density_src_pop_model.total_number_of_expected_mergers(T_obs)
+        N_tot = self.merger_rate_density_src_pop_model.total_number_of_mergers(T_obs)
         N_exp = self.expected_number_of_mergers(T_obs, IFAR_threshold=IFAR_threshold)
 
         return N_exp/N_tot
@@ -51,7 +51,7 @@ class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
 
         column_names = list(pop_inj_info["injections"])
         # This is going to take a while......
-        self.pop_inj_info = pd.DataFrame(columns=column_names, data={column: pop_inj_info["injections"][column] for column in column_names})
+        self.pop_inj_info = pd.DataFrame(data={column: pop_inj_info["injections"][column] for column in column_names})
 
         pop_inj_info.close()
 

@@ -44,7 +44,7 @@ class Marginalized(SourcePopulationPrior):
 
 
 class MarginalizedMergerRateDensity(Marginalized):
-    def total_number_of_expected_mergers(self, R_0, T_obs):
+    def total_number_of_mergers(self, T_obs):
         return 1.0
  
 
@@ -121,7 +121,7 @@ class PowerLawRedshift(SourcePopulationPrior):
             dataset=dataset, lamb=self.population_parameter_dict["kappa"]
         )
 
-    def total_number_of_expected_mergers(self, T_obs):
+    def total_number_of_mergers(self, T_obs):
         # R_0 is in the unit of Gpc^-3 T_obs^-1
         # Since astropy.cosmology is using Mpc as the default unit
         return self.population_parameter_dict["R_0"] / 1e9 * T_obs * \
