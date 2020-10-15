@@ -137,7 +137,7 @@ class PowerLawRedshift(SourcePopulationPrior):
 
     def ln_dN_over_dz(self, dataset):
         # NOTE This is not a normalized probability
-        return np.log(self.population_parameter_dict["R_0"]) + np.log(
+        return np.log(self.population_parameter_dict["R_0"] / 1e9) + np.log(
             self._PowerLawRedshift.differential_spacetime_volume(
                 dataset=dataset, lamb=self.population_parameter_dict["kappa"]
             )
