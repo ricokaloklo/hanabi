@@ -26,6 +26,9 @@ setuptools.setup(
         "hanabi.inference",
         "hanabi.hierarchical"
     ],
+    package_data={
+        "hanabi.hierarchical": ["data/o3a_bbhpop_inj_info.hdf"]
+    },
     entry_points={
         "console_scripts": [
             "hanabi_joint_pipe=hanabi.inference.joint_main:main",
