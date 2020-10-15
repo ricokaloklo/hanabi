@@ -92,18 +92,25 @@ class LensingJointLikelihood(JointLikelihood):
                     # Overwrite the luminosity distance here to the apparent luminosity distance
                     relative_magnification = trigger_parameters.pop("relative_magnification")
                     trigger_parameters["luminosity_distance"] = trigger_parameters["luminosity_distance"]/(np.sqrt(relative_magnification))
-
                     # NOTE We cannot get the source redshift here!
 
                 elif "absolute_magnification" in trigger_parameters.keys():
                     # Overwrite the luminosity distance here to the apparent luminosity distance
                     absolute_magnification = trigger_parameters.pop("absolute_magnification")
                     source_luminosity_distance = trigger_parameters.pop("luminosity_distance")
-                    trigger_parameters["luminosity_distance"] = source_luminosity_distance/np.sqrt(absolute_magnification)
                     # Convert source luminosity distance to source redshift in case needed
                     trigger_parameters["redshift"] = bilby.gw.conversion.luminosity_distance_to_redshift(source_luminosity_distance)
 
-            if "redshift" in common_parameters:
-                raise NotImplementedError("The code does not support sampling over redshift yet")
+                    trigger_parameters["luminosity_distance"] = source_luminosity_distance/np.sqrt(absolute_magnification)
+
+            elif "redshift" in common_parameters:
+                if "relative_magnification" in trigger_parameters.keys():
+                    raise NotImplementedError("Sampling in redshift requires absolute magnification. Sample in luminosity distance instead if you want to use relative magnification")
+                elif "absolute_magnification" in trigger_parameters.keys():
+                    source_redshift = trigger_parameters["redshift"]
+                    source_luminosity_distance = bilby.gw.conversion.redshift_to_luminosity_distance(source_redshift)
+                    # Overwrite the luminosity distance here to the apparent luminosity distance
+                    absolute_magnification = trigger_parameters.pop("absolute_magnification")
+                    trigger_parameters["luminosity_distance"] = source_luminosity_distance/np.sqrt(absolute_magnification)
         
         return parameters_per_trigger
