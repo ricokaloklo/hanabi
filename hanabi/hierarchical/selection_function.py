@@ -78,7 +78,7 @@ class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
             np.NINF
         )
 
-        log_N_exp = np.log(self.pop_inj_analysis_time_yr) - np.log(T_obs) + np.logaddexp.reduce(log_dN - np.log(self.pop_inj_info["sampling_pdf"])) - np.log(self.pop_inj_total_generated)
+        log_N_exp = np.log(T_obs) + np.logaddexp.reduce(log_dN - np.log(self.pop_inj_info["sampling_pdf"])) - np.log(self.pop_inj_total_generated)
 
         return np.exp(log_N_exp)
 
