@@ -50,7 +50,6 @@ class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
             setattr(self, "pop_inj_{}".format(key), value)
 
         column_names = list(pop_inj_info["injections"])
-        # This is going to take a while......
         self.pop_inj_info = pd.DataFrame(data={column: pop_inj_info["injections"][column] for column in column_names})
 
         pop_inj_info.close()
@@ -74,11 +73,11 @@ class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
             detected,
             self.mass_src_pop_model.ln_prob(self.pop_inj_info) + \
             self.spin_src_pop_model.ln_prob(self.pop_inj_info) + \
-            self.merger_rate_density_src_pop_model.ln_prob(self.pop_inj_info),
+            self.merger_rate_density_src_pop_model.ln_dN_over_dz(self.pop_inj_info),
             np.NINF
         )
-
-        log_N_exp = np.log(T_obs) + np.logaddexp.reduce(log_dN - np.log(self.pop_inj_info["sampling_pdf"])) - np.log(self.pop_inj_total_generated)
+        log_p_draw = np.log(self.pop_inj_info["sampling_pdf"].to_numpy())
+        log_N_exp = np.log(T_obs) + np.logaddexp.reduce(log_dN - log_p_draw) - np.log(self.pop_inj_total_generated)
 
         return np.exp(log_N_exp)
 
