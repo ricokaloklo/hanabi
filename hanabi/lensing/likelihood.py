@@ -83,6 +83,9 @@ class LensingJointLikelihood(JointLikelihood):
             single_trigger_likelihood.waveform_generator.parameter_conversion = convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
 
     def assign_trigger_level_parameters(self, full_parameters=None):
+        if full_parameters is None:
+            full_parameters = self.parameters
+
         common_parameters = [p for p in full_parameters.keys() if self.sep_char not in p]
         parameters_per_trigger = super(LensingJointLikelihood, self).assign_trigger_level_parameters(full_parameters)
 
