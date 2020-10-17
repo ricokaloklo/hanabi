@@ -55,7 +55,7 @@ class JointLikelihood(bilby.core.likelihood.Likelihood):
 
     def log_likelihood(self):
         # Sum over all the log_likelihood values with the appropriate parameters passed
-        parameters_per_trigger = self.assign_trigger_level_parameters()
+        parameters_per_trigger = self.assign_trigger_level_parameters(full_parameters=self.parameters)
         logL = 0.0
 
         for single_trigger_likelihood, single_trigger_parameters in zip(self.single_trigger_likelihoods, parameters_per_trigger):
