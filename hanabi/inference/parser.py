@@ -349,7 +349,7 @@ def create_joint_parser(prog, prog_version):
         "--common-parameters",
         action="append",
         help=(
-            "A list of common parameters that are forced to take the same value across different triggers, "
+            "A list of common parameters that are imposed to take the same value across different triggers, "
             "specified either by `common-parameters=[chirp_mass, mass_ratio]` or "
             "as command-line arguments by `--common-parameters chirp_mass --common-parameters mass_ratio`"
         )
@@ -359,11 +359,9 @@ def create_joint_parser(prog, prog_version):
         type=nonestr,
         default=None,
         help=(
-            "A dictionary of prior for lensing magnification and image type. If the magnification of the first trigger "
-            "is set to 1, then the magnification is interpreted as the relative magnification. "
-            "Otherwise, the magnification is interpreted as the absolute magnification. "
-            "Specified by lensing-prior-dict={magnification^1 = 1, magnification^2 = PowerLaw(...)} for relative magnification, or "
-            "lensing-prior-dict={magnification^1 = PowerLaw(...), magnification^2 = PowerLaw(...)} for absolute magnification"
+            "A dictionary of prior for lensing magnification and image type."
+            "Specified by lensing-prior-dict={relative-magnification^(1) = 1, relative-magnification^(2) = PowerLaw(...)} for relative magnification, or "
+            "lensing-prior-dict={absolute-magnification^(1) = PowerLaw(...), absolute-magnification^(2) = PowerLaw(...)} for absolute magnification"
         )
     )
 
