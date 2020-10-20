@@ -60,7 +60,7 @@ class JointLikelihood(bilby.core.likelihood.Likelihood):
 
         for single_trigger_likelihood, single_trigger_parameters in zip(self.single_trigger_likelihoods, parameters_per_trigger):
             # Assign the single_trigger_parameters to the likelihood object for evaluation
-            single_trigger_likelihood.parameters = single_trigger_parameters
+            single_trigger_likelihood.parameters.update(single_trigger_parameters)
 
             # Calculate the log likelihood
             logL += single_trigger_likelihood.log_likelihood()
@@ -104,7 +104,7 @@ class LensingJointLikelihood(JointLikelihood):
                     absolute_magnification = trigger_parameters.pop("absolute_magnification")
                     source_luminosity_distance = trigger_parameters.pop("luminosity_distance")
                     # Convert source luminosity distance to source redshift in case needed
-                    trigger_parameters["redshift"] = bilby.gw.conversion.luminosity_distance_to_redshift(source_luminosity_distance)
+                    trigger_parameters["redshift"] = bilby.gw.conversion.luminosity_distance_to_redshift(source_luminosity_distance).item()
 
                     trigger_parameters["luminosity_distance"] = source_luminosity_distance/np.sqrt(absolute_magnification)
             elif "redshift" in common_parameters:
