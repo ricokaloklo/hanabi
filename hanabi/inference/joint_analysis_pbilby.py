@@ -230,6 +230,9 @@ os.environ["MPI_PER_NODE"] = "16"
 analysis_parser = create_joint_analysis_pbilby_parser(__prog__, __version__)
 input_args, unknown_args = bilby_pipe.utils.parse_args(bilby_pipe.utils.get_command_line_arguments(), analysis_parser)
 
+input_args.scheduler = "slurm"
+input_args.sampler = "dynesty"
+
 # Initializing a JointAnalysisInput object
 analysis = JointDataAnalysisInput(input_args, [])
 outdir = analysis.outdir
