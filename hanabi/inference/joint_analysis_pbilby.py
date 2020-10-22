@@ -26,6 +26,7 @@ from dynesty import NestedSampler
 from pandas import DataFrame
 
 from .parser import create_joint_parser
+from .utils import remove_argument_from_parser
 from .joint_analysis import JointDataAnalysisInput
 from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
 from parallel_bilby.utils import (
@@ -54,6 +55,40 @@ logger = logging.getLogger(__prog__)
 
 def create_joint_analysis_pbilby_parser():
     parser = create_joint_parser(__prog__, __version__)
+
+    # Remove options
+    bilby_pipe_arguments_to_ignore = [
+        "version",
+        "accounting",
+        "local",
+        "local-generation",
+        "local-plot",
+        "request-memory",
+        "request-memory-generation",
+        "request-cpus",
+        "singularity-image",
+        "scheduler",
+        "scheduler-args",
+        "scheduler-module",
+        "scheduler-env",
+        "transfer-files",
+        "online-pe",
+        "osg",
+        "email",
+        "postprocessing-executable",
+        "postprocessing-arguments",
+        "sampler",
+        "sampling-seed",
+        "sampler-kwargs",
+        "plot-calibration",
+        "plot-corner",
+        "plot-format",
+        "plot-marginal",
+        "plot-skymap",
+        "plot-waveform",
+    ]
+    for arg in bilby_pipe_arguments_to_ignore:
+        remove_argument_from_parser(parser, arg)
 
     # Add new options
     parser.add(
