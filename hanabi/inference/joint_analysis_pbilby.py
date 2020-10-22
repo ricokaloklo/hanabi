@@ -37,11 +37,6 @@ from parallel_bilby.utils import (
     safe_file_dump,
     stopwatch,
 )
-from parallel_bilby.parser import (
-    _add_dynesty_settings_to_parser,
-    _add_slurm_settings_to_parser,
-    _add_misc_settings_to_parser,
-)
 
 
 mpi4py.rc.threads = False

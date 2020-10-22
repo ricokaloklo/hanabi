@@ -4,6 +4,11 @@ import bilby_pipe.bilbyargparser
 from bilby_pipe.parser import StoreBoolean
 from bilby_pipe.utils import nonestr, nonefloat, noneint
 from .utils import remove_argument_from_parser
+from parallel_bilby.parser import (
+    _add_dynesty_settings_to_parser,
+    _add_slurm_settings_to_parser,
+    _add_misc_settings_to_parser,
+)
 import configargparse
 import logging
 
