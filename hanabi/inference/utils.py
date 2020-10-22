@@ -1,10 +1,18 @@
 import bilby_pipe
 import logging
 
-def generate_dag(joint_input):
-    """ Do nothing for now
-    """
-    pass
+# Useful routine from parallel_bilby
+def remove_argument_from_parser(parser, arg):
+    for action in parser._actions:
+        if action.dest == arg.replace("-", "_"):
+            try:
+                parser._handle_conflict_resolve(None, [("--" + arg, action)])
+            except ValueError as e:
+                logger.warning("Error removing {}: {}".format(arg, e))
+    logger.debug(
+        "Request to remove arg {} from bilby_pipe args, but arg not found".format(arg)
+    )
+
 
 # The following code is modified from bilby_pipe.utils
 def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
