@@ -69,3 +69,5 @@ def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
 setup_logger("hanabi_joint_pipe")
 # Initialize a logger for hanabi_joint_analysis
 setup_logger("hanabi_joint_analysis")
+# Initialize a logger for hanabi_joint_analysis_pbilby
+setup_logger("hanabi_joint_analysis_pbilby")
