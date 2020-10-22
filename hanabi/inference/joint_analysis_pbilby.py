@@ -233,6 +233,7 @@ input_args, unknown_args = bilby_pipe.utils.parse_args(bilby_pipe.utils.get_comm
 input_args.scheduler = "slurm"
 input_args.sampler = "dynesty"
 input_args.request_cpus = 1 # fake
+input_args.sampler_kwargs = {} # fake
 
 # Initializing a JointAnalysisInput object
 analysis = JointDataAnalysisInput(input_args, [])
