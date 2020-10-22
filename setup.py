@@ -33,14 +33,15 @@ setuptools.setup(
         "console_scripts": [
             "hanabi_joint_pipe=hanabi.inference.joint_main:main",
             "hanabi_joint_analysis=hanabi.inference.joint_analysis:main",
-            "hanabi_joint_analysis_pbilby=hanabi.inference.joint_analysis_pbilby:main"
-            "hanabi_postprocess_result=hanabi.inference.postprocessing:main"
+            "hanabi_joint_analysis_pbilby=hanabi.inference.joint_analysis_pbilby:main",
+            "hanabi_postprocess_result=hanabi.inference.postprocessing:main",
         ]
     },
     install_requires=[
         "bilby==1.0.2",
         "bilby_pipe==1.0.2",
-        "gwpopulation"
+        "parallel_bilby==0.1.5",
+        "gwpopulation",
     ],
     classifiers=[
         "Programming Language :: Python :: 3.6",
