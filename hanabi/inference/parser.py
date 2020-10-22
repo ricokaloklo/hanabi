@@ -7,90 +7,6 @@ from .utils import remove_argument_from_parser
 import configargparse
 import logging
 
-def create_joint_analysis_pbilby_parser(prog, prog_version):
-    parser = create_joint_parser(prog, prog_version)
-
-    # Remove options
-    bilby_pipe_arguments_to_ignore = [
-        "version",
-        "accounting",
-        "local",
-        "local-generation",
-        "local-plot",
-        "request-memory",
-        "request-memory-generation",
-        "request-cpus",
-        "singularity-image",
-        "scheduler",
-        "scheduler-args",
-        "scheduler-module",
-        "scheduler-env",
-        "transfer-files",
-        "online-pe",
-        "osg",
-        "email",
-        "postprocessing-executable",
-        "postprocessing-arguments",
-        "sampler",
-        "sampling-seed",
-        "sampler-kwargs",
-        "plot-calibration",
-        "plot-corner",
-        "plot-format",
-        "plot-marginal",
-        "plot-skymap",
-        "plot-waveform",
-    ]
-    for arg in bilby_pipe_arguments_to_ignore:
-        remove_argument_from_parser(parser, arg, prog)
-
-    # Add new options
-    parser.add(
-        "--data-dump-files",
-        action="append",
-        help=(
-            "A list of data dump files for each trigger, "
-            "specified either by `data-dump-files=[FILE1, FILE2]` or "
-            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
-        )
-    )
-
-    parser = _add_slurm_settings_to_parser(parser)
-    parser = _add_dynesty_settings_to_parser(parser)
-    parser = _add_misc_settings_to_parser(parser)
-
-    return parser
-
-def create_joint_analysis_parser(prog, prog_version):
-    parser = create_joint_parser(prog, prog_version)
-
-    # Add new options
-    parser.add(
-        "--data-dump-files",
-        action="append",
-        help=(
-            "A list of data dump files for each trigger, "
-            "specified either by `data-dump-files=[FILE1, FILE2]` or "
-            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
-        )
-    )
-
-    return parser
-
-def create_joint_main_parser(prog, prog_version):
-    parser = create_joint_parser(prog, prog_version)
-
-    # Add new options
-    parser.add(
-        "--pbilby",
-        action="store_true",
-        help=(
-            "Use parallel_bilby instead"
-        )
-    )
-
-    return parser
-
 
 def create_joint_parser(prog, prog_version):
     """
@@ -468,7 +384,95 @@ def create_joint_parser(prog, prog_version):
 
     return parser
 
+
+def create_joint_analysis_parser(prog, prog_version):
+    parser = create_joint_parser(prog, prog_version)
+
+    # Add new options
+    parser.add(
+        "--data-dump-files",
+        action="append",
+        help=(
+            "A list of data dump files for each trigger, "
+            "specified either by `data-dump-files=[FILE1, FILE2]` or "
+            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
+        )
+    )
+
+    return parser
+
+
+def create_joint_main_parser(prog, prog_version):
+    parser = create_joint_parser(prog, prog_version)
+
+    # Add new options
+    parser.add(
+        "--pbilby",
+        action="store_true",
+        help=(
+            "Use parallel_bilby instead"
+        )
+    )
+
+    return parser
+
+def create_joint_analysis_pbilby_parser(prog, prog_version):
+    parser = create_joint_parser(prog, prog_version)
+
+    # Remove options
+    bilby_pipe_arguments_to_ignore = [
+        "version",
+        "accounting",
+        "local",
+        "local-generation",
+        "local-plot",
+        "request-memory",
+        "request-memory-generation",
+        "request-cpus",
+        "singularity-image",
+        "scheduler",
+        "scheduler-args",
+        "scheduler-module",
+        "scheduler-env",
+        "transfer-files",
+        "online-pe",
+        "osg",
+        "email",
+        "postprocessing-executable",
+        "postprocessing-arguments",
+        "sampler",
+        "sampling-seed",
+        "sampler-kwargs",
+        "plot-calibration",
+        "plot-corner",
+        "plot-format",
+        "plot-marginal",
+        "plot-skymap",
+        "plot-waveform",
+    ]
+    for arg in bilby_pipe_arguments_to_ignore:
+        remove_argument_from_parser(parser, arg, prog)
+
+    # Add new options
+    parser.add(
+        "--data-dump-files",
+        action="append",
+        help=(
+            "A list of data dump files for each trigger, "
+            "specified either by `data-dump-files=[FILE1, FILE2]` or "
+            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
+        )
+    )
+
+    parser = _add_slurm_settings_to_parser(parser)
+    parser = _add_dynesty_settings_to_parser(parser)
+    parser = _add_misc_settings_to_parser(parser)
+
+    return parser
+
+
 def print_unrecognized_arguments(unknown_args, logger):
     if len(unknown_args) > 0:
         msg = [bilby_pipe.utils.tcolors.WARNING, f"Unrecognized arguments {unknown_args}", bilby_pipe.utils.tcolors.END]
         logger.warning(" ".join(msg))
+
