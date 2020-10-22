@@ -70,9 +70,9 @@ def create_joint_analysis_pbilby_parser():
         )
     )
 
-    _add_slurm_settings_to_parser(parser)
-    _add_dynesty_settings_to_parser(parser)
-    _add_misc_settings_to_parser(parser)
+    parser = _add_slurm_settings_to_parser(parser)
+    parser = _add_dynesty_settings_to_parser(parser)
+    parser = _add_misc_settings_to_parser(parser)
 
     return parser
 
