@@ -15,6 +15,7 @@ import bilby_pipe.utils
 from .utils import (
     setup_logger,
     write_complete_config_file,
+    turn_off_forbidden_option,
 )
 
 from .parser import create_joint_parser, print_unrecognized_arguments
@@ -100,11 +101,11 @@ class JointMainInput(bilby_pipe.input.Input):
         self.requirements = []
 
         # Turn off automatic submission
-        turn_off_forbidden_option(self, "submit")
+        turn_off_forbidden_option(self, "submit", __prog__)
         # NOTE We don't support PostProcessAllResultsNode for now, we will support this later
-        turn_off_forbidden_option(self, "postprocessing_executable")
+        turn_off_forbidden_option(self, "postprocessing_executable", __prog__)
         # NOTE For now we don't support plotting, we will support this later
-        turn_off_forbidden_option(self, "create_plots")
+        turn_off_forbidden_option(self, "create_plots", __prog__)
 
     # The following lines of code are also modified from bilby_pipe
     @property
@@ -167,10 +168,11 @@ def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
         args, unknown_args = bilby_pipe.utils.parse_args([trigger_ini_file], bilby_pipe_parser)
         main_input = bilby_pipe.main.MainInput(args, unknown_args)
 
-        turn_off_forbidden_option(main_input, "submit")
-        turn_off_forbidden_option(args, "submit")
-        turn_off_forbidden_option(args, "distance_marginalization")
-        turn_off_forbidden_option(args, "phase_marginalization")
+        turn_off_forbidden_option(main_input, "submit", __prog__)
+        turn_off_forbidden_option(args, "submit", __prog__)
+        turn_off_forbidden_option(args, "distance_marginalization", __prog__)
+        turn_off_forbidden_option(args, "phase_marginalization", __prog__)
+        turn_off_forbidden_option(args, "time_marginalization", __prog__)
 
         if write_dag:
             bilby_pipe.main.write_complete_config_file(bilby_pipe_parser, args, main_input)
@@ -180,12 +182,6 @@ def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
 
     return single_trigger_pe_inputs
 
-def turn_off_forbidden_option(input, forbidden_option):
-    # NOTE Only support boolean option
-    if getattr(input, forbidden_option, False):
-        logger = logging.getLogger(__prog__)
-        logger.info(f"Turning off {forbidden_option}")
-        setattr(input, forbidden_option, False)
 
 def generate_dag(joint_main_input, single_trigger_pe_inputs):
     dag = Dag(joint_main_input)
@@ -262,7 +258,7 @@ def main():
     single_trigger_pe_inputs = generate_single_trigger_pe_inputs(joint_main_input, write_dag=True)
 
     # Write the complete config ini file
-    write_complete_config_file(parser, args, joint_main_input)
+    write_complete_config_file(parser, args, joint_main_input, __prog__)
 
     # Generate the dag for the joint analysis
     generate_dag(joint_main_input, single_trigger_pe_inputs)
