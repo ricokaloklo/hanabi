@@ -21,8 +21,8 @@ from hanabi.lensing.waveform import *
 
 # Lensing likelihood
 import hanabi.lensing.likelihood
-from .utils import setup_logger, create_joint_analysis_parser
-from .parser import create_joint_parser
+from .utils import setup_logger
+from .parser import create_joint_analysis_parser
 
 from .._version import __version__
 __prog__ = "hanabi_joint_analysis"
