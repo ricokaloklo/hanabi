@@ -40,13 +40,7 @@ from parallel_bilby.parser import (
     _add_slurm_settings_to_parser,
     _add_misc_settings_to_parser,
 )
-import parallel_bilby.analysis.write_current_state
-import parallel_bilby.analysis.plot_current_state
-import parallel_bilby.analysis.read_saved_state
-from parallel_bilby.analysis import (
-    reorder_loglikelihoods,
-    write_sample_dump,
-)
+
 
 mpi4py.rc.threads = False
 mpi4py.rc.recv_mprobe = False
@@ -84,23 +78,168 @@ def main():
     pass
 
 
+def reorder_loglikelihoods(unsorted_loglikelihoods, unsorted_samples, sorted_samples):
+    """Reorders the stored log-likelihood after they have been reweighted
+
+    This creates a sorting index by matching the reweights `result.samples`
+    against the raw samples, then uses this index to sort the
+    loglikelihoods
+
+    Parameters
+    ----------
+    sorted_samples, unsorted_samples: array-like
+        Sorted and unsorted values of the samples. These should be of the
+        same shape and contain the same sample values, but in different
+        orders
+    unsorted_loglikelihoods: array-like
+        The loglikelihoods corresponding to the unsorted_samples
+
+    Returns
+    -------
+    sorted_loglikelihoods: array-like
+        The loglikelihoods reordered to match that of the sorted_samples
+
+
+    """
+
+    idxs = []
+    for ii in range(len(unsorted_loglikelihoods)):
+        idx = np.where(np.all(sorted_samples[ii] == unsorted_samples, axis=1))[0]
+        if len(idx) > 1:
+            print(
+                "Multiple likelihood matches found between sorted and "
+                "unsorted samples. Taking the first match."
+            )
+        idxs.append(idx[0])
+    return unsorted_loglikelihoods[idxs]
+
 
 @stopwatch
 def write_current_state(sampler, resume_file, sampling_time):
-    parallel_bilby.analysis.write_current_state(sampler, resume_file, sampling_time)
+    """Writes a checkpoint file
+
+    Parameters
+    ----------
+    sampler: dynesty.NestedSampler
+        The sampler object itself
+    resume_file: str
+        The name of the resume/checkpoint file to use
+    sampling_time: float
+        The total sampling time in seconds
+    """
+    print("")
+    logger.info("Start checkpoint writing")
+    sampler.kwargs["sampling_time"] = sampling_time
+    if dill.pickles(sampler):
+        safe_file_dump(sampler, resume_file, dill)
+        logger.info("Written checkpoint file {}".format(resume_file))
+    else:
+        logger.warning("Cannot write pickle resume file!")
+
+
+def write_sample_dump(sampler, samples_file, search_parameter_keys):
+    """Writes a checkpoint file
+
+    Parameters
+    ----------
+    sampler: dynesty.NestedSampler
+        The sampler object itself
+    """
+
+    ln_weights = sampler.saved_logwt - sampler.saved_logz[-1]
+    weights = np.exp(ln_weights)
+    samples = bilby.core.result.rejection_sample(np.array(sampler.saved_v), weights)
+    nsamples = len(samples)
+
+    # If we don't have enough samples, don't dump them
+    if nsamples < 100:
+        return
+
+    logger.info("Writing {} current samples to {}".format(nsamples, samples_file))
+    df = DataFrame(samples, columns=search_parameter_keys)
+    df.to_csv(samples_file, index=False, header=True, sep=" ")
 
 
 @stopwatch
 def plot_current_state(sampler, search_parameter_keys, outdir, label):
-    parallel_bilby.analysis.plot_current_state(sampler, search_parameter_keys, outdir, label)
+    labels = [label.replace("_", " ") for label in search_parameter_keys]
+    try:
+        filename = "{}/{}_checkpoint_trace.png".format(outdir, label)
+        fig = dyplot.traceplot(sampler.results, labels=labels)[0]
+        fig.tight_layout()
+        fig.savefig(filename)
+    except (
+        AssertionError,
+        RuntimeError,
+        np.linalg.linalg.LinAlgError,
+        ValueError,
+    ) as e:
+        logger.warning(e)
+        logger.warning("Failed to create dynesty state plot at checkpoint")
+    finally:
+        plt.close("all")
+    try:
+        filename = "{}/{}_checkpoint_run.png".format(outdir, label)
+        fig, axs = dyplot.runplot(sampler.results)
+        fig.tight_layout()
+        plt.savefig(filename)
+    except (RuntimeError, np.linalg.linalg.LinAlgError, ValueError) as e:
+        logger.warning(e)
+        logger.warning("Failed to create dynesty run plot at checkpoint")
+    finally:
+        plt.close("all")
+    try:
+        filename = "{}/{}_checkpoint_stats.png".format(outdir, label)
+        fig, axs = plt.subplots(nrows=3, sharex=True)
+        for ax, name in zip(axs, ["boundidx", "nc", "scale"]):
+            ax.plot(getattr(sampler, f"saved_{name}"), color="C0")
+            ax.set_ylabel(name)
+        axs[-1].set_xlabel("iteration")
+        fig.tight_layout()
+        plt.savefig(filename)
+    except (RuntimeError, ValueError) as e:
+        logger.warning(e)
+        logger.warning("Failed to create dynesty stats plot at checkpoint")
+    finally:
+        plt.close("all")
 
 
 @stopwatch
 def read_saved_state(resume_file, continuing=True):
-    return parallel_bilby.analysis.read_saved_state(
-        resume_file,
-        continuing
-    )
+    """
+    Read a saved state of the sampler to disk.
+
+    The required information to reconstruct the state of the run is read from a
+    pickle file.
+
+    Parameters
+    ----------
+    resume_file: str
+        The path to the resume file to read
+
+    Returns
+    -------
+    sampler: dynesty.NestedSampler
+        If a resume file exists and was successfully read, the nested sampler
+        instance updated with the values stored to disk. If unavailable,
+        returns False
+    sampling_time: int
+        The sampling time from previous runs
+    """
+
+    if os.path.isfile(resume_file):
+        logger.info("Reading resume file {}".format(resume_file))
+        with open(resume_file, "rb") as file:
+            sampler = dill.load(file)
+            if sampler.added_live and continuing:
+                sampler._remove_live_points()
+            sampler.nqueue = -1
+            sampler.rstate = np.random
+            sampling_time = sampler.kwargs.pop("sampling_time")
+        return sampler, sampling_time
+    else:
+        logger.info("Resume file {} does not exist.".format(resume_file))
+        return False, 0
 
 
 ##### Main starts here #####
