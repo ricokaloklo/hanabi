@@ -2,6 +2,31 @@ import bilby_pipe
 import logging
 
 
+def write_complete_config_file(parser, args, inputs):
+    # Also copied from bilby_pipe
+    args_dict = vars(args).copy()
+    for key, val in args_dict.items():
+        if key == "label":
+            continue
+        if isinstance(val, str):
+            if os.path.isfile(val) or os.path.isdir(val):
+                setattr(args, key, os.path.abspath(val))
+        if isinstance(val, list):
+            if isinstance(val[0], str):
+                setattr(args, key, f"[{', '.join(val)}]")
+    args.sampler_kwargs = str(inputs.sampler_kwargs)
+
+    logger = logging.getLogger(__prog__)
+    logger.info(f"Writing the complete config ini file to {inputs.complete_ini_file}")
+
+    parser.write_to_file(
+        filename=inputs.complete_ini_file,
+        args=args,
+        overwrite=False,
+        include_description=False,
+    )
+
+
 # The following code is modified from bilby_pipe.utils
 def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
     """Setup logging output: call at the start of the script to use
