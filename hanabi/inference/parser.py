@@ -77,6 +77,21 @@ def create_joint_analysis_parser(prog, prog_version):
 
     return parser
 
+def create_joint_main_parser(prog, prog_version):
+    parser = create_joint_parser(prog, prog_version)
+
+    # Add new options
+    parser.add(
+        "--pbilby",
+        action="store_true",
+        help=(
+            "Use parallel_bilby instead"
+        )
+    )
+
+    return parser
+
+
 def create_joint_parser(prog, prog_version):
     """
     Create a parser to read the joint analysis config ini

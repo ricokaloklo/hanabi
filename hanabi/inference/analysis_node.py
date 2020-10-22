@@ -4,8 +4,19 @@ from bilby_pipe.job_creation.node import Node
 from .fake_generation_node import FakeGenerationNode
 from bilby_pipe.job_creation.bilby_pipe_dag_creator import get_trigger_time_list
 
+class JointAnalysisNodeUsingParallelBilby(JointAnalysisNode):
+    def __init__(self, joint_main_input, single_trigger_pe_inputs, parallel_idx, dag, analysis_prog_name="hanabi_joint_analysis_pbilby"):
+        super(JointAnalysisNodeUsingParallelBilby, self).__init__(
+            joint_main_input,
+            single_trigger_pe_inputs,
+            parallel_idx,
+            dag,
+            analysis_prog_name
+        )
+
+
 class JointAnalysisNode(Node):
-    def __init__(self, joint_main_input, single_trigger_pe_inputs, parallel_idx, dag):
+    def __init__(self, joint_main_input, single_trigger_pe_inputs, parallel_idx, dag, analysis_prog_name="hanabi_joint_analysis"):
         self.joint_main_input = joint_main_input
         self.single_trigger_pe_inputs = single_trigger_pe_inputs
         super().__init__(self.joint_main_input)
@@ -15,7 +26,7 @@ class JointAnalysisNode(Node):
         self.request_cpus = joint_main_input.request_cpus
         self.n_triggers = joint_main_input.n_triggers
 
-        self.analysis_prog_name = "hanabi_joint_analysis"
+        self.analysis_prog_name = analysis_prog_name
 
         self.base_job_name = "{}_{}".format(self.joint_main_input.label, self.analysis_prog_name)
         if parallel_idx != "":

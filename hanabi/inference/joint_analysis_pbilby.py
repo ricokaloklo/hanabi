@@ -13,6 +13,7 @@ import time
 from importlib import import_module
 
 import bilby
+import bilby_pipe
 import dill
 import dynesty
 import dynesty.plotting as dyplot
@@ -232,8 +233,7 @@ os.environ["MPI_PER_NODE"] = "16"
 
 # Setting up parser to parse the config
 analysis_parser = create_joint_analysis_pbilby_parser(__prog__, __version__)
-cli_args = get_cli_args()
-input_args = analysis_parser.parse_args(args=cli_args)
+input_args, unknown_args = bilby_pipe.utils.parse_args(bilby_pipe.utils.get_command_line_arguments(), analysis_parser)
 
 # Initializing a JointAnalysisInput object
 analysis = JointDataAnalysisInput(input_args, [])
