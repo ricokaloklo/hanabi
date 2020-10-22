@@ -22,7 +22,7 @@ def remove_argument_from_parser(parser, arg, prog):
     )
 
 
-def create_joint_parser(prog, prog_version):
+def create_joint_main_parser(prog, prog_version):
     """
     Create a parser to read the joint analysis config ini
     """
