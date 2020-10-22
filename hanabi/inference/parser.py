@@ -7,6 +7,21 @@ import configargparse
 import logging
 
 
+# Useful function copied from parallel_bilby
+def remove_argument_from_parser(parser, arg, prog):
+    logger = logging.getLogger(prog)
+
+    for action in parser._actions:
+        if action.dest == arg.replace("-", "_"):
+            try:
+                parser._handle_conflict_resolve(None, [("--" + arg, action)])
+            except ValueError as e:
+                logger.warning("Error removing {}: {}".format(arg, e))
+    logger.debug(
+        "Request to remove arg {} from bilby_pipe args, but arg not found".format(arg)
+    )
+
+
 def create_joint_parser(prog, prog_version):
     """
     Create a parser to read the joint analysis config ini
