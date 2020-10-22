@@ -1,10 +1,6 @@
 import bilby_pipe
 import logging
 
-def generate_dag(joint_input):
-    """ Do nothing for now
-    """
-    pass
 
 # The following code is modified from bilby_pipe.utils
 def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
