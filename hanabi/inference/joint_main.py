@@ -28,84 +28,18 @@ class JointMainInput(bilby_pipe.input.Input):
         self.known_args = args
         self.unknown_args = unknown_args
 
-        self.n_triggers = args.n_triggers
-        self.trigger_ini_files = args.trigger_ini_files
-        self.common_parameters = args.common_parameters
-        self.lensing_prior_dict = args.lensing_prior_dict
-        self.lensed_waveform_model = args.lensed_waveform_model
-        self.retry_for_data_generation = args.retry_for_data_generation
+        self.outdir = args.outdir
+        self.label = args.label
+        # Read the rest of the supported arguments
+        for name in dir(args):
+            if not name.startswith("_"):
+                setattr(self, name, getattr(args, name, None))
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
 
-        """
-        These are the options that hanabi_joint_pipe
-        should also recognize, copied from bilby_pipe
-        """
-        self.submit = args.submit
-        self.condor_job_priority = args.condor_job_priority
-        self.online_pe = args.online_pe
-        self.create_plots = args.create_plots
-        self.singularity_image = args.singularity_image
-        self.create_summary = args.create_summary
-
-        self.outdir = args.outdir
-        self.label = args.label
-        self.log_directory = args.log_directory
-        self.accounting = args.accounting
-        self.sampler = args.sampler
-        self.n_parallel = args.n_parallel
-        self.transfer_files = args.transfer_files
-        self.osg = args.osg
-
-        self.webdir = args.webdir
-        self.email = args.email
-        self.notification = args.notification
-        self.existing_dir = args.existing_dir
-
-        self.scheduler = args.scheduler
-        self.scheduler_args = args.scheduler_args
-        self.scheduler_module = args.scheduler_module
-        self.scheduler_env = args.scheduler_env
-        self.scheduler_analysis_time = args.scheduler_analysis_time
-
-        self.run_local = args.local
-        self.local_generation = args.local_generation
-        self.local_plot = args.local_plot
-
-        self.request_memory = args.request_memory
-        self.request_memory_generation = args.request_memory_generation
-        self.request_cpus = args.request_cpus
-        self.sampler_kwargs = args.sampler_kwargs
-
-        if self.create_plots:
-            for plot_attr in [
-                "calibration",
-                "corner",
-                "marginal",
-                "skymap",
-                "waveform",
-                "format",
-            ]:
-                attr = f"plot_{plot_attr}"
-                setattr(self, attr, getattr(args, attr))
-
-        self.postprocessing_executable = args.postprocessing_executable
-        self.postprocessing_arguments = args.postprocessing_arguments
-        self.single_postprocessing_executable = args.single_postprocessing_executable
-        self.single_postprocessing_arguments = args.single_postprocessing_arguments
-
-        self.summarypages_arguments = args.summarypages_arguments
-
         self.extra_lines = []
         self.requirements = []
-
-        # Turn off automatic submission
-        turn_off_forbidden_option(self, "submit", __prog__)
-        # NOTE We don't support PostProcessAllResultsNode for now, we will support this later
-        turn_off_forbidden_option(self, "postprocessing_executable", __prog__)
-        # NOTE For now we don't support plotting, we will support this later
-        turn_off_forbidden_option(self, "create_plots", __prog__)
 
     # The following lines of code are also modified from bilby_pipe
     @property
