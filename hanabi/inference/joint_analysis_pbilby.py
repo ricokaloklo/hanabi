@@ -40,7 +40,9 @@ from parallel_bilby.parser import (
     _add_slurm_settings_to_parser,
     _add_misc_settings_to_parser,
 )
-import parallel_bilby.analysis
+import parallel_bilby.analysis.write_current_state
+import parallel_bilby.analysis.plot_current_state
+import parallel_bilby.analysis.read_saved_state
 from parallel_bilby.analysis import (
     reorder_loglikelihoods,
     write_sample_dump,
