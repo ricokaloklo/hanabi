@@ -4,16 +4,6 @@ from bilby_pipe.job_creation.node import Node
 from .fake_generation_node import FakeGenerationNode
 from bilby_pipe.job_creation.bilby_pipe_dag_creator import get_trigger_time_list
 
-class JointAnalysisNodeUsingParallelBilby(JointAnalysisNode):
-    def __init__(self, joint_main_input, single_trigger_pe_inputs, parallel_idx, dag, analysis_prog_name="hanabi_joint_analysis_pbilby"):
-        super(JointAnalysisNodeUsingParallelBilby, self).__init__(
-            joint_main_input,
-            single_trigger_pe_inputs,
-            parallel_idx,
-            dag,
-            analysis_prog_name
-        )
-
 
 class JointAnalysisNode(Node):
     def __init__(self, joint_main_input, single_trigger_pe_inputs, parallel_idx, dag, analysis_prog_name="hanabi_joint_analysis"):
@@ -100,3 +90,13 @@ class JointAnalysisNode(Node):
         """ Default wall-time for base-name """
         # Seven days
         return self.joint_main_input.scheduler_analysis_time
+
+class JointAnalysisNodeUsingParallelBilby(JointAnalysisNode):
+    def __init__(self, joint_main_input, single_trigger_pe_inputs, parallel_idx, dag, analysis_prog_name="hanabi_joint_analysis_pbilby"):
+        super(JointAnalysisNodeUsingParallelBilby, self).__init__(
+            joint_main_input,
+            single_trigger_pe_inputs,
+            parallel_idx,
+            dag,
+            analysis_prog_name
+        )
