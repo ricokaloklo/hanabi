@@ -2,30 +2,22 @@ import bilby_pipe
 import logging
 
 
-def write_complete_config_file(parser, args, inputs):
-    # Also copied from bilby_pipe
-    args_dict = vars(args).copy()
-    for key, val in args_dict.items():
-        if key == "label":
-            continue
-        if isinstance(val, str):
-            if os.path.isfile(val) or os.path.isdir(val):
-                setattr(args, key, os.path.abspath(val))
-        if isinstance(val, list):
-            if isinstance(val[0], str):
-                setattr(args, key, f"[{', '.join(val)}]")
-    args.sampler_kwargs = str(inputs.sampler_kwargs)
+def turn_off_forbidden_option(input, forbidden_option, prog):
+    # NOTE Only support boolean option
+    if getattr(input, forbidden_option, False):
+        logger = logging.getLogger(prog)
+        logger.info(f"Turning off {forbidden_option}")
+        setattr(input, forbidden_option, False)
 
-    logger = logging.getLogger(__prog__)
-    logger.info(f"Writing the complete config ini file to {inputs.complete_ini_file}")
 
-    parser.write_to_file(
-        filename=inputs.complete_ini_file,
-        args=args,
-        overwrite=False,
-        include_description=False,
-    )
+def write_complete_config_file(parser, args, inputs, prog):
+    try:
+        bilby_pipe.main.write_complete_config_file(parser, args, inputs)
+    except AttributeError:
+        pass
 
+    logger = logging.getLogger(prog)
+    logger.info(f"Complete ini written: {inputs.complete_ini_file}")
 
 # The following code is modified from bilby_pipe.utils
 def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
