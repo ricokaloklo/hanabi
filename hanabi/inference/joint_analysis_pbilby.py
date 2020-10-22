@@ -88,7 +88,7 @@ def create_joint_analysis_pbilby_parser():
         "plot-waveform",
     ]
     for arg in bilby_pipe_arguments_to_ignore:
-        remove_argument_from_parser(parser, arg)
+        remove_argument_from_parser(parser, arg, __prog__)
 
     # Add new options
     parser.add(
