@@ -14,7 +14,7 @@ import bilby_pipe.utils
 # NOTE Importing the following will initialize a logger for hanabi_joint_pipe
 from .utils import setup_logger
 
-from .parser import create_joint_main_parser, print_unrecognized_arguments
+from .parser import create_joint_parser, print_unrecognized_arguments
 from .._version import __version__
 
 __prog__ = "hanabi_joint_pipe"
@@ -33,7 +33,6 @@ class JointMainInput(bilby_pipe.input.Input):
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
-
 
         """
         These are the options that hanabi_joint_pipe
@@ -270,7 +269,7 @@ def main():
     """
     Top level interface for hanabi_joint_pipe
     """
-    parser = create_joint_main_parser(__prog__, __version__)
+    parser = create_joint_parser(__prog__, __version__)
     args, unknown_args = bilby_pipe.utils.parse_args(bilby_pipe.utils.get_command_line_arguments(), parser)
 
     # Initialize our own logger

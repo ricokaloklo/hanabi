@@ -2,9 +2,7 @@ import bilby_pipe
 import logging
 
 # Useful routine from parallel_bilby
-def remove_argument_from_parser(parser, arg, prog_name):
-    logger = logging.getLogger(prog_name)
-
+def remove_argument_from_parser(parser, arg):
     for action in parser._actions:
         if action.dest == arg.replace("-", "_"):
             try:

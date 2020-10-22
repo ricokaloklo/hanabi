@@ -13,7 +13,6 @@ import time
 from importlib import import_module
 
 import bilby
-import bilby_pipe
 import dill
 import dynesty
 import dynesty.plotting as dyplot
@@ -26,7 +25,7 @@ from bilby.gw import conversion
 from dynesty import NestedSampler
 from pandas import DataFrame
 
-from .parser import create_joint_analysis_pbilby_parser
+from .parser import create_joint_parser
 from .utils import remove_argument_from_parser
 from .joint_analysis import JointDataAnalysisInput
 from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
@@ -36,6 +35,11 @@ from parallel_bilby.utils import (
     get_initial_points_from_prior,
     safe_file_dump,
     stopwatch,
+)
+from parallel_bilby.parser import (
+    _add_dynesty_settings_to_parser,
+    _add_slurm_settings_to_parser,
+    _add_misc_settings_to_parser,
 )
 
 
@@ -47,6 +51,61 @@ from .._version import __version__
 from .utils import setup_logger
 __prog__ = "hanabi_joint_analysis_pbilby"
 logger = logging.getLogger(__prog__)
+
+
+def create_joint_analysis_pbilby_parser():
+    parser = create_joint_parser(__prog__, __version__)
+
+    # Remove options
+    bilby_pipe_arguments_to_ignore = [
+        "version",
+        "accounting",
+        "local",
+        "local-generation",
+        "local-plot",
+        "request-memory",
+        "request-memory-generation",
+        "request-cpus",
+        "singularity-image",
+        "scheduler",
+        "scheduler-args",
+        "scheduler-module",
+        "scheduler-env",
+        "transfer-files",
+        "online-pe",
+        "osg",
+        "email",
+        "postprocessing-executable",
+        "postprocessing-arguments",
+        "sampler",
+        "sampling-seed",
+        "sampler-kwargs",
+        "plot-calibration",
+        "plot-corner",
+        "plot-format",
+        "plot-marginal",
+        "plot-skymap",
+        "plot-waveform",
+    ]
+    for arg in bilby_pipe_arguments_to_ignore:
+        remove_argument_from_parser(parser, arg)
+
+    # Add new options
+    parser.add(
+        "--data-dump-files",
+        action="append",
+        help=(
+            "A list of data dump files for each trigger, "
+            "specified either by `data-dump-files=[FILE1, FILE2]` or "
+            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
+        )
+    )
+
+    parser = _add_slurm_settings_to_parser(parser)
+    parser = _add_dynesty_settings_to_parser(parser)
+    parser = _add_misc_settings_to_parser(parser)
+
+    return parser
 
 
 def main():
@@ -227,13 +286,9 @@ os.environ["MKL_DYNAMIC"] = "0"
 os.environ["MPI_PER_NODE"] = "16"
 
 # Setting up parser to parse the config
-analysis_parser = create_joint_analysis_pbilby_parser(__prog__, __version__)
-input_args, unknown_args = bilby_pipe.utils.parse_args(bilby_pipe.utils.get_command_line_arguments(), analysis_parser)
-
-input_args.scheduler = "slurm"
-input_args.sampler = "dynesty"
-input_args.request_cpus = 1 # fake
-input_args.sampler_kwargs = "Default" # fake
+analysis_parser = create_joint_analysis_pbilby_parser()
+cli_args = get_cli_args()
+input_args = analysis_parser.parse_args(args=cli_args)
 
 # Initializing a JointAnalysisInput object
 analysis = JointDataAnalysisInput(input_args, [])
