@@ -42,6 +42,7 @@ setuptools.setup(
         "bilby_pipe==1.0.2",
         "parallel_bilby==0.1.5",
         "gwpopulation",
+        "mpi4py",
     ],
     classifiers=[
         "Programming Language :: Python :: 3.6",
