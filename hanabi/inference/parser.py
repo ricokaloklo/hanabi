@@ -241,6 +241,22 @@ def create_joint_main_parser(prog, prog_version):
 
     return joint_main_parser
 
+def create_joint_analysis_parser(prog, prog_version):
+    parser = create_joint_main_parser(prog, prog_version)
+
+    # Add new options
+    parser.add(
+        "--data-dump-files",
+        action="append",
+        help=(
+            "A list of data dump files for each trigger, "
+            "specified either by `data-dump-files=[FILE1, FILE2]` or "
+            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
+        )
+    )
+
+    return parser
+
 def create_joint_generation_pbilby_parser(prog, prog_version):
     base_parser = _create_base_parser(prog, prog_version)
     bilby_pipe_parser = _remove_arguments_from_bilby_pipe_parser_for_pbilby(
@@ -266,6 +282,22 @@ def create_joint_generation_pbilby_parser(prog, prog_version):
     purge_empty_argument_group(joint_generation_pbilby_parser)
 
     return joint_generation_pbilby_parser
+
+def create_joint_analysis_pbilby_parser(prog, prog_version):
+    parser = create_joint_generation_pbilby_parser(prog, prog_version)
+
+    # Add new options
+    parser.add(
+        "--data-dump-files",
+        action="append",
+        help=(
+            "A list of data dump files for each trigger, "
+            "specified either by `data-dump-files=[FILE1, FILE2]` or "
+            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
+        )
+    )
+
+    return parser
 
 def print_unrecognized_arguments(unknown_args, logger):
     if len(unknown_args) > 0:

@@ -22,7 +22,7 @@ from hanabi.lensing.waveform import *
 # Lensing likelihood
 import hanabi.lensing.likelihood
 from .utils import setup_logger
-from .parser import create_joint_parser
+from .parser import create_joint_analysis_parser
 
 from .._version import __version__
 __prog__ = "hanabi_joint_analysis"
@@ -244,26 +244,10 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             exit_code=CHECKPOINT_EXIT_CODE,
             **self.sampler_kwargs
         )
-        
 
-def create_joint_analysis_parser():
-    parser = create_joint_parser(__prog__, __version__)
-
-    # Add new options
-    parser.add(
-        "--data-dump-files",
-        action="append",
-        help=(
-            "A list of data dump files for each trigger, "
-            "specified either by `data-dump-files=[FILE1, FILE2]` or "
-            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
-        )
-    )
-
-    return parser
 
 def main():
-    args, unknown_args = bilby_pipe.utils.parse_args(sys.argv[1:], create_joint_analysis_parser())
+    args, unknown_args = bilby_pipe.utils.parse_args(sys.argv[1:], create_joint_analysis_parser(__prog__, __version__))
     analysis = JointDataAnalysisInput(args, unknown_args)
     analysis.run_sampler()
     sys.exit(0)
