@@ -122,6 +122,7 @@ def _remove_arguments_from_bilby_pipe_parser_for_pbilby(bilby_pipe_parser, prog)
         "scheduler-module",
         "scheduler-env",
         "condor-job-priority",
+        "periodic-restart-time",
         "transfer-files",
         "online-pe",
         "osg",
