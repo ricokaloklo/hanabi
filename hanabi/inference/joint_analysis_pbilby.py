@@ -556,29 +556,8 @@ with MPIPool(
         logger.info("Using {} samples".format(nsamples))
 
         posterior = conversion.fill_from_fixed_priors(posterior, priors)
-
-        logger.info(
-            "Generating posterior from marginalized parameters for"
-            f" nsamples={len(posterior)}, POOL={pool.size}"
-        )
-        fill_args = [(ii, row, likelihood) for ii, row in posterior.iterrows()]
-        samples = pool.map(fill_sample, fill_args)
-        result.posterior = pd.DataFrame(samples)
-
-        logger.debug("Updating prior to the actual prior")
-        for par, name in zip(
-            ["distance", "phase", "time"],
-            ["luminosity_distance", "phase", "geocent_time"],
-        ):
-            if getattr(likelihood, "{}_marginalization".format(par), False):
-                priors[name] = likelihood.priors[name]
+        result.posterior = pd.DataFrame(posterior)
         result.priors = priors
-
-        if args.convert_to_flat_in_component_mass:
-            try:
-                result = bilby.gw.prior.convert_to_flat_in_component_mass_prior(result)
-            except Exception as e:
-                logger.warning(f"Unable to convert to the LALInference prior: {e}")
 
         logger.info(f"Saving result to {outdir}/{label}_result.json")
         result.save_to_file(extension="json")
