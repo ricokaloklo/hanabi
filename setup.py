@@ -34,6 +34,7 @@ setuptools.setup(
             "hanabi_joint_pipe=hanabi.inference.joint_main:main",
             "hanabi_joint_analysis=hanabi.inference.joint_analysis:main",
             "hanabi_joint_generation_pbilby=hanabi.inference.joint_generation_pbilby:main",
+            "hanabi_joint_analysis_pbilby=hanabi.inference.joint_analysis_pbilby:main",
             "hanabi_postprocess_result=hanabi.inference.postprocessing:main",
         ]
     },
