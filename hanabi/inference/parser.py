@@ -9,14 +9,22 @@ import logging
 
 def purge_empty_argument_group(parser):
     non_empty_action_groups = []
+    non_empty_mutually_exclusive_groups = []
+
     try:
+        # Purge _action_groups
         for action_group in parser._action_groups:
             if action_group._group_actions != []:
                 non_empty_action_groups.append(action_group)
+        # Purge _mutually_exclusive_groups
+        for action_group in parser._mutually_exclusive_groups:
+            if action_group._group_actions != []:
+                non_empty_mutually_exclusive_groups.append(action_group)
     except:
         pass
 
     parser._action_groups = non_empty_action_groups
+    parser._mutually_exclusive_groups = non_empty_mutually_exclusive_groups
 
 
 def remove_arguments_from_parser(parser, args, prog):
@@ -179,7 +187,7 @@ def create_joint_main_parser(prog, prog_version):
     )
 
     joint_main_parser = _add_hanabi_settings_to_parser(joint_main_parser)
-    joint_main_parser._mutually_exclusive_groups = []
+    purge_empty_argument_group(joint_main_parser)
 
     return joint_main_parser
 
