@@ -39,7 +39,9 @@ setuptools.setup(
     install_requires=[
         "bilby==1.0.2",
         "bilby_pipe==1.0.2",
-        "gwpopulation"
+        "gwpopulation",
+        "parallel_bilby==0.1.5",
+        "mpi4py",
     ],
     classifiers=[
         "Programming Language :: Python :: 3.6",
