@@ -45,31 +45,16 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         """
         Initalize multiple SingleTriggerDataAnalysisInput
         """
-        self.n_triggers = args.n_triggers
-        # NOTE The ini files passed should be the complete ones
-        self.trigger_ini_files = args.trigger_ini_files
-        self.common_parameters = args.common_parameters
-        self.lensing_prior_dict = args.lensing_prior_dict
-        self.data_dump_files = args.data_dump_files
-        self.lensed_waveform_model = args.lensed_waveform_model
-        self.retry_for_data_generation = args.retry_for_data_generation
-        # Parse the lensing prior dict
-        self.parse_lensing_prior_dict()
-
-        # Admin arguments
-        self.ini = args.ini
-        self.scheduler = args.scheduler
-        self.periodic_restart_time = args.periodic_restart_time
-        self.request_cpus = args.request_cpus
-
         # Naming arguments
         self.outdir = args.outdir
         self.label = args.label
-
-        # Choices for running
-        self.sampler = args.sampler
-        self.sampler_kwargs = args.sampler_kwargs
-        self.sampling_seed = args.sampling_seed
+        # Read the rest of the supported arguments
+        for name in dir(args):
+            if not name.startswith("_"):
+                setattr(self, name, getattr(args, name, None))
+        
+        # Parse the lensing prior dict
+        self.parse_lensing_prior_dict()
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
