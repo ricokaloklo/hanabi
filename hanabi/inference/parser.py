@@ -288,12 +288,6 @@ def create_joint_analysis_pbilby_parser(prog, prog_version):
 
     # Add new options
     parser.add(
-        "ini",
-        type=str,
-        is_config_file=True,
-        help="Configuration ini file"
-    )
-    parser.add(
         "--data-dump-files",
         action="append",
         help=(
