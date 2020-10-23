@@ -87,6 +87,9 @@ def _create_reduced_bilby_pipe_parser(prog):
         "osg",
         "single-postprocessing-executable",
         "single-postprocessing-arguments",
+        "create-summary",
+        "notification",
+        "email",
     ]
 
     keep_arguments_from_parser(bilby_pipe_parser, bilby_pipe_arguments_to_keep, prog)
@@ -177,7 +180,7 @@ def create_joint_main_parser(prog, prog_version):
 
     joint_main_parser = _add_hanabi_settings_to_parser(joint_main_parser)
     joint_main_parser._mutually_exclusive_groups = []
-    
+
     return joint_main_parser
 
 def print_unrecognized_arguments(unknown_args, logger):

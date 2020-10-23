@@ -30,6 +30,7 @@ class JointMainInput(bilby_pipe.input.Input):
 
         self.outdir = args.outdir
         self.label = args.label
+        self.run_local = args.local
         # Read the rest of the supported arguments
         for name in dir(args):
             if not name.startswith("_"):
