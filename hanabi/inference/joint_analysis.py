@@ -22,7 +22,7 @@ from hanabi.lensing.waveform import *
 # Lensing likelihood
 import hanabi.lensing.likelihood
 from .utils import setup_logger
-from .parser import create_joint_parser
+from .parser import create_joint_analysis_parser
 
 from .._version import __version__
 __prog__ = "hanabi_joint_analysis"
@@ -45,31 +45,16 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         """
         Initalize multiple SingleTriggerDataAnalysisInput
         """
-        self.n_triggers = args.n_triggers
-        # NOTE The ini files passed should be the complete ones
-        self.trigger_ini_files = args.trigger_ini_files
-        self.common_parameters = args.common_parameters
-        self.lensing_prior_dict = args.lensing_prior_dict
-        self.data_dump_files = args.data_dump_files
-        self.lensed_waveform_model = args.lensed_waveform_model
-        self.retry_for_data_generation = args.retry_for_data_generation
-        # Parse the lensing prior dict
-        self.parse_lensing_prior_dict()
-
-        # Admin arguments
-        self.ini = args.ini
-        self.scheduler = args.scheduler
-        self.periodic_restart_time = args.periodic_restart_time
-        self.request_cpus = args.request_cpus
-
         # Naming arguments
         self.outdir = args.outdir
         self.label = args.label
-
-        # Choices for running
-        self.sampler = args.sampler
-        self.sampler_kwargs = args.sampler_kwargs
-        self.sampling_seed = args.sampling_seed
+        # Read the rest of the supported arguments
+        for name in dir(args):
+            if not name.startswith("_"):
+                setattr(self, name, getattr(args, name, None))
+        
+        # Parse the lensing prior dict
+        self.parse_lensing_prior_dict()
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
@@ -244,26 +229,10 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             exit_code=CHECKPOINT_EXIT_CODE,
             **self.sampler_kwargs
         )
-        
 
-def create_joint_analysis_parser():
-    parser = create_joint_parser(__prog__, __version__)
-
-    # Add new options
-    parser.add(
-        "--data-dump-files",
-        action="append",
-        help=(
-            "A list of data dump files for each trigger, "
-            "specified either by `data-dump-files=[FILE1, FILE2]` or "
-            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
-        )
-    )
-
-    return parser
 
 def main():
-    args, unknown_args = bilby_pipe.utils.parse_args(sys.argv[1:], create_joint_analysis_parser())
+    args, unknown_args = bilby_pipe.utils.parse_args(sys.argv[1:], create_joint_analysis_parser(__prog__, __version__))
     analysis = JointDataAnalysisInput(args, unknown_args)
     analysis.run_sampler()
     sys.exit(0)

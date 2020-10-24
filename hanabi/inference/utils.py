@@ -1,6 +1,6 @@
 import bilby_pipe
 import logging
-
+import os
 
 def turn_off_forbidden_option(input, forbidden_option, prog):
     # NOTE Only support boolean option
@@ -11,10 +11,23 @@ def turn_off_forbidden_option(input, forbidden_option, prog):
 
 
 def write_complete_config_file(parser, args, inputs, prog):
-    try:
-        bilby_pipe.main.write_complete_config_file(parser, args, inputs)
-    except AttributeError:
-        pass
+    args_dict = vars(args).copy()
+    for key, val in args_dict.items():
+        if key == "label":
+            continue
+        if isinstance(val, str):
+            if os.path.isfile(val) or os.path.isdir(val):
+                setattr(args, key, os.path.abspath(val))
+        if isinstance(val, list):
+            if isinstance(val[0], str):
+                setattr(args, key, f"[{', '.join(val)}]")
+    args.sampler_kwargs = str(inputs.sampler_kwargs)
+    parser.write_to_file(
+        filename=inputs.complete_ini_file,
+        args=args,
+        overwrite=False,
+        include_description=False,
+    )
 
     logger = logging.getLogger(prog)
     logger.info(f"Complete ini written: {inputs.complete_ini_file}")
@@ -82,3 +95,7 @@ def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
 setup_logger("hanabi_joint_pipe")
 # Initialize a logger for hanabi_joint_analysis
 setup_logger("hanabi_joint_analysis")
+# Initialize a logger for hanabi_joint_generation_pbilby
+setup_logger("hanabi_joint_generation_pbilby")
+# Initialize a logger for hanabi_joint_analysis_pbilby
+setup_logger("hanabi_joint_analysis_pbilby")

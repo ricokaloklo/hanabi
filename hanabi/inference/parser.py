@@ -5,7 +5,11 @@ from bilby_pipe.parser import StoreBoolean
 from bilby_pipe.utils import nonestr, nonefloat, noneint
 import argparse
 import logging
-
+from parallel_bilby.parser import (
+    _add_dynesty_settings_to_parser,
+    _add_slurm_settings_to_parser,
+    _add_misc_settings_to_parser,
+)
 
 def purge_empty_argument_group(parser):
     non_empty_action_groups = []
@@ -61,9 +65,7 @@ def _create_base_parser(prog, prog_version):
 
     return base_parser
 
-def _create_reduced_bilby_pipe_parser(prog):
-    bilby_pipe_parser = bilby_pipe.parser.create_parser()
-
+def _remove_arguments_from_bilby_pipe_parser_for_hanabi(bilby_pipe_parser, prog):
     bilby_pipe_arguments_to_keep = [
         "ini",
         "help",
@@ -101,6 +103,52 @@ def _create_reduced_bilby_pipe_parser(prog):
     ]
 
     keep_arguments_from_parser(bilby_pipe_parser, bilby_pipe_arguments_to_keep, prog)
+
+    return bilby_pipe_parser
+
+def _remove_arguments_from_bilby_pipe_parser_for_pbilby(bilby_pipe_parser, prog):
+    bilby_pipe_arguments_to_ignore = [
+        "version",
+        "accounting",
+        "local",
+        "local-generation",
+        "local-plot",
+        "request-memory",
+        "request-memory-generation",
+        "request-cpus",
+        "singularity-image",
+        "scheduler",
+        "scheduler-args",
+        "scheduler-module",
+        "scheduler-env",
+        "condor-job-priority",
+        "periodic-restart-time",
+        "transfer-files",
+        "online-pe",
+        "osg",
+        "email",
+        "postprocessing-executable",
+        "postprocessing-arguments",
+        "sampler",
+        "sampling-seed",
+        "sampler-kwargs",
+        "plot-calibration",
+        "plot-corner",
+        "plot-format",
+        "plot-marginal",
+        "plot-skymap",
+        "plot-waveform",
+    ]
+
+    remove_arguments_from_parser(bilby_pipe_parser, bilby_pipe_arguments_to_ignore, prog)
+
+    bilby_pipe_parser.add_argument(
+        "--sampler",
+        choices=["dynesty"],
+        default="dynesty",
+        type=str,
+        help="The parallelised sampler to use, defaults to dynesty",
+    )
 
     return bilby_pipe_parser
 
@@ -176,7 +224,9 @@ def _add_hanabi_settings_to_parser(parser):
 
 def create_joint_main_parser(prog, prog_version):
     base_parser = _create_base_parser(prog, prog_version)
-    bilby_pipe_parser = _create_reduced_bilby_pipe_parser(prog)
+    bilby_pipe_parser = _remove_arguments_from_bilby_pipe_parser_for_hanabi(
+        bilby_pipe.parser.create_parser(), prog
+    )
 
     joint_main_parser = bilby_pipe.bilbyargparser.BilbyArgParser(
         prog=prog,
@@ -190,6 +240,64 @@ def create_joint_main_parser(prog, prog_version):
     purge_empty_argument_group(joint_main_parser)
 
     return joint_main_parser
+
+def create_joint_analysis_parser(prog, prog_version):
+    parser = create_joint_main_parser(prog, prog_version)
+
+    # Add new options
+    parser.add(
+        "--data-dump-files",
+        action="append",
+        help=(
+            "A list of data dump files for each trigger, "
+            "specified either by `data-dump-files=[FILE1, FILE2]` or "
+            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
+        )
+    )
+
+    return parser
+
+def create_joint_generation_pbilby_parser(prog, prog_version):
+    base_parser = _create_base_parser(prog, prog_version)
+    bilby_pipe_parser = _remove_arguments_from_bilby_pipe_parser_for_pbilby(
+        bilby_pipe.parser.create_parser(), prog
+    )
+    bilby_pipe_parser = _remove_arguments_from_bilby_pipe_parser_for_hanabi(
+        bilby_pipe_parser, prog
+    )
+
+    joint_generation_pbilby_parser = bilby_pipe.bilbyargparser.BilbyArgParser(
+        prog=prog,
+        ignore_unknown_config_file_keys=False,
+        allow_abbrev=False,
+        add_help=False,
+        parents=[base_parser, bilby_pipe_parser]       
+    )
+
+    joint_generation_pbilby_parser = _add_dynesty_settings_to_parser(joint_generation_pbilby_parser)
+    joint_generation_pbilby_parser = _add_slurm_settings_to_parser(joint_generation_pbilby_parser)
+    joint_generation_pbilby_parser = _add_misc_settings_to_parser(joint_generation_pbilby_parser)
+    joint_generation_pbilby_parser = _add_hanabi_settings_to_parser(joint_generation_pbilby_parser)
+
+    purge_empty_argument_group(joint_generation_pbilby_parser)
+
+    return joint_generation_pbilby_parser
+
+def create_joint_analysis_pbilby_parser(prog, prog_version):
+    parser = create_joint_generation_pbilby_parser(prog, prog_version)
+
+    # Add new options
+    parser.add(
+        "--data-dump-files",
+        action="append",
+        help=(
+            "A list of data dump files for each trigger, "
+            "specified either by `data-dump-files=[FILE1, FILE2]` or "
+            "as command-line arguments by `--data-dump-files FILE1 --data-dump-files FILE2`"
+        )
+    )
+
+    return parser
 
 def print_unrecognized_arguments(unknown_args, logger):
     if len(unknown_args) > 0:
