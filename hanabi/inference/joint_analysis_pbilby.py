@@ -38,9 +38,89 @@ from parallel_bilby.utils import (
 mpi4py.rc.threads = False
 mpi4py.rc.recv_mprobe = False
 
+from .joint_analysis import JointDataAnalysisInput as JointDataAnalysisInputForBilby
 from .._version import __version__
 __prog__ = "hanabi_joint_analysis_pbilby"
 logger = logging.getLogger(__prog__)
+
+
+def setup_likelihood(interferometers, waveform_generator, priors, args):
+    """Takes the kwargs and sets up and returns  either an ROQ GW or GW likelihood.
+
+    Parameters
+    ----------
+    interferometers: bilby.gw.detectors.InterferometerList
+        The pre-loaded bilby IFO
+    waveform_generator: bilby.gw.waveform_generator.WaveformGenerator
+        The waveform generation
+    priors: dict
+        The priors, used for setting up marginalization
+    args: Namespace
+        The parser arguments
+
+
+    Returns
+    -------
+    likelihood: bilby.gw.likelihood.GravitationalWaveTransient
+        The likelihood (either GravitationalWaveTransient or ROQGravitationalWaveTransient)
+
+    """
+
+    likelihood_kwargs = dict(
+        interferometers=interferometers,
+        waveform_generator=waveform_generator,
+        priors=priors,
+        phase_marginalization=args.phase_marginalization,
+        distance_marginalization=args.distance_marginalization,
+        distance_marginalization_lookup_table=args.distance_marginalization_lookup_table,
+        time_marginalization=args.time_marginalization,
+        reference_frame=args.reference_frame,
+        time_reference=args.time_reference,
+    )
+
+    if args.likelihood_type == "GravitationalWaveTransient":
+        Likelihood = bilby.gw.likelihood.GravitationalWaveTransient
+        likelihood_kwargs.update(jitter_time=args.jitter_time)
+
+    elif args.likelihood_type == "ROQGravitationalWaveTransient":
+        Likelihood = bilby.gw.likelihood.ROQGravitationalWaveTransient
+
+        if args.time_marginalization:
+            logger.warning(
+                "Time marginalization not implemented for "
+                "ROQGravitationalWaveTransient: option ignored"
+            )
+
+        likelihood_kwargs.pop("time_marginalization", None)
+        likelihood_kwargs.pop("jitter_time", None)
+        likelihood_kwargs.update(roq_likelihood_kwargs(args))
+    elif "." in args.likelihood_type:
+        split_path = args.likelihood_type.split(".")
+        module = ".".join(split_path[:-1])
+        likelihood_class = split_path[-1]
+        Likelihood = getattr(import_module(module), likelihood_class)
+        likelihood_kwargs.update(args.extra_likelihood_kwargs)
+        if "roq" in args.likelihood_type.lower():
+            likelihood_kwargs.pop("time_marginalization", None)
+            likelihood_kwargs.pop("jitter_time", None)
+            likelihood_kwargs.update(args.roq_likelihood_kwargs)
+    else:
+        raise ValueError("Unknown Likelihood class {}")
+
+    likelihood_kwargs = {
+        key: likelihood_kwargs[key]
+        for key in likelihood_kwargs
+        if key in inspect.getfullargspec(Likelihood.__init__).args
+    }
+
+    logger.info(
+        "Initialise likelihood {} with kwargs: \n{}".format(
+            Likelihood, likelihood_kwargs
+        )
+    )
+
+    likelihood = Likelihood(**likelihood_kwargs)
+    return likelihood
 
 
 def main():
@@ -212,6 +292,30 @@ def read_saved_state(resume_file, continuing=True):
         return False, 0
 
 # Main starts here
+class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
+    def initialize_single_trigger_data_analysis_inputs(self):
+        self.single_trigger_likelihoods = []
+        self.single_trigger_priors = []
+
+        # Loop over data dump files to construct the priors and likelihoods from single triggers
+        for data_dump_file in self.data_dump_files:
+            with open(data_dump_file, "rb") as f:
+                data_dump = pickle.load(f)
+                ifo_list = data_dump["ifo_list"]
+                waveform_generator = data_dump["waveform_generator"]
+                waveform_generator.start_time = ifo_list[0].time_array[0]
+                args = data_dump["args"]
+                priors = bilby.gw.prior.PriorDict.from_json(data_dump["prior_file"])
+                self.single_trigger_priors.append(priors)
+
+                likelihood = setup_likelihood(
+                    interferometers=ifo_list,
+                    waveform_generator=waveform_generator,
+                    priors=priors,
+                    args=args,
+                )
+                self.single_trigger_likelihoods.append(likelihood)
+
 
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -222,35 +326,11 @@ analysis_parser = create_joint_analysis_pbilby_parser(__prog__, __version__)
 cli_args = get_cli_args()
 input_args = analysis_parser.parse_args(args=cli_args)
 
-with open(input_args.data_dump, "rb") as file:
-    data_dump = pickle.load(file)
-
-ifo_list = data_dump["ifo_list"]
-waveform_generator = data_dump["waveform_generator"]
-waveform_generator.start_time = ifo_list[0].time_array[0]
-args = data_dump["args"]
-injection_parameters = data_dump.get("injection_parameters", None)
-
-args.weight_file = data_dump["meta_data"].get("weight_file", None)
-
-outdir = args.outdir
-if input_args.outdir is not None:
-    outdir = input_args.outdir
-label = args.label
-if input_args.label is not None:
-    label = input_args.label
-
-priors = bilby.gw.prior.PriorDict.from_json(data_dump["prior_file"])
-
-logger.setLevel(logging.WARNING)
-likelihood = setup_likelihood(
-    interferometers=ifo_list,
-    waveform_generator=waveform_generator,
-    priors=priors,
-    args=args,
-)
-logger.setLevel(logging.INFO)
-
+# Construct a JointDataAnalysisInput object for pbilby
+analysis = JointDataAnalysisInput(input_args, [])
+outdir = input_args.outdir
+label = input_args.label
+likelihood, priors = analysis.get_likelihood_and_priors()
 
 def prior_transform_function(u_array):
     return priors.rescale(sampling_keys, u_array)
@@ -271,7 +351,7 @@ def log_prior_function(v_array):
     params = {key: t for key, t in zip(sampling_keys, v_array)}
     return priors.ln_prob(params)
 
-
+# Setting up priors and sampling keys
 sampling_keys = []
 for p in priors:
     if isinstance(priors[p], bilby.core.prior.Constraint):
@@ -293,14 +373,7 @@ for ii, key in enumerate(sampling_keys):
         logger.debug("Setting reflective boundary for {}".format(key))
         reflective.append(ii)
 
-# Setting marginalized parameters to their reference values
-if likelihood.phase_marginalization:
-    likelihood.parameters["phase"] = priors["phase"]
-if likelihood.time_marginalization:
-    likelihood.parameters["geocent_time"] = priors["geocent_time"]
-if likelihood.distance_marginalization:
-    likelihood.parameters["luminosity_distance"] = priors["luminosity_distance"]
-
+# Setting up sampler
 if input_args.dynesty_sample == "rwalk":
     logger.debug("Using the bilby-implemented rwalk sample method")
     dynesty.dynesty._SAMPLING["rwalk"] = bilby.core.sampler.dynesty.sample_rwalk_bilby
@@ -525,16 +598,13 @@ with MPIPool(
         result.priors = priors
         result.samples = dynesty.utils.resample_equal(out.samples, weights)
         result.nested_samples = nested_samples
-        result.meta_data = data_dump["meta_data"]
+        result.meta_data = {} # empty
         result.meta_data["command_line_args"] = vars(input_args)
         result.meta_data["command_line_args"]["sampler"] = "parallel_bilby"
-        result.meta_data["config_file"] = vars(args)
-        result.meta_data["data_dump"] = input_args.data_dump
-        result.meta_data["likelihood"] = likelihood.meta_data
+        result.meta_data["config_file"] = analysis.ini
+        result.meta_data["likelihood"] = {} # Probably empty
         result.meta_data["sampler_kwargs"] = init_sampler_kwargs
         result.meta_data["run_sampler_kwargs"] = sampler_kwargs
-        result.meta_data["injection_parameters"] = injection_parameters
-        result.injection_parameters = injection_parameters
 
         result.log_likelihood_evaluations = reorder_loglikelihoods(
             unsorted_loglikelihoods=out.logl,
@@ -549,7 +619,6 @@ with MPIPool(
         result.sampling_time = sampling_time
 
         result.samples_to_posterior()
-
         posterior = result.posterior
 
         nsamples = len(posterior)
