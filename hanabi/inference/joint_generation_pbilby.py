@@ -1,9 +1,11 @@
 #!/usr/bin/env python
+import os
 import subprocess
 import copy
 import logging
 import bilby_pipe
 from parallel_bilby.utils import get_cli_args
+from parallel_bilby.parser import create_generation_parser
 from .parser import create_joint_generation_pbilby_parser
 from .utils import write_complete_config_file as _write_complete_config_file
 from .slurm_pbilby import setup_submit
@@ -36,9 +38,12 @@ def generate_single_trigger_pe_data_dump_files(joint_generation_input):
         try:
             logger.info(f"Running parallel_bilby_generation for {trigger_ini_file}")
             subprocess.run(["parallel_bilby_generation {}".format(trigger_ini_file)], shell=True)
+            # parse the ini file to get data_dir and label
+            generation_parser = create_generation_parser()
+            args = generation_parser.parse_args([trigger_ini_file])
             data_dump_files.append("{data_dir}/{label}_data_dump.pickle".format(
-                data_dir=joint_generation_input.data_directory,
-                label=joint_generation_input.label,
+                data_dir=os.path.join(args.outdir, "data"),
+                label=args.label,
             ))
         except:
             logger.error(f"Failed to generate parallel_bilby data dump file for {trigger_ini_file}")

@@ -75,11 +75,16 @@ class AnalysisNode(parallel_bilby.slurm.AnalysisNode):
 
     def get_run_string(self):
         run_list = [self.inputs.complete_ini_file]
-        run_list += ["--data-dump-file {}".format(data_dump_file) for data_dump_file in self.data_dump_files]
+        run_list += ["--data-dump-files {}".format(data_dump_file) for data_dump_file in self.data_dump_files]
         run_list.append("--label {}".format(self.label))
         run_list.append("--outdir {}".format(abspath(self.inputs.result_directory)))
         run_list.append(
             "--sampling-seed {}".format(self.inputs.sampling_seed + self.idx)
         )
+        # Override bad --mpi-timing-interval
+        if self.inputs.mpi_timing_interval == False:
+            run_list.append(
+                "--mpi-timing-interval {}".format(0)
+            )
 
         return " ".join(run_list)
