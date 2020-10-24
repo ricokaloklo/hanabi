@@ -331,6 +331,8 @@ analysis = JointDataAnalysisInput(input_args, [])
 outdir = input_args.outdir
 label = input_args.label
 likelihood, priors = analysis.get_likelihood_and_priors()
+# Make sure that priors is of PriorDict
+priors = bilby.core.prior.PriorDict(priors)
 
 def prior_transform_function(u_array):
     return priors.rescale(sampling_keys, u_array)
