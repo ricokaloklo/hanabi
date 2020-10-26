@@ -140,6 +140,18 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         result_dir = os.path.join(self.outdir, "result")
         return os.path.relpath(result_dir)
 
+    @staticmethod
+    def _check_consistency_between_data_analysis_inputs(single_trigger_pe_inputs):
+        arguments_to_check = [
+            "reference_frequency",
+        ]
+
+        for arg in arguments_to_check:
+            # Compare the value set with that set in the first input
+            value_set_in_first_input = getattr(single_trigger_pe_inputs[0], arg, None)
+            if not all([getattr(i, arg, None) == value_set_in_first_input for i in single_trigger_pe_inputs]):
+                raise ValueError("{} is not set consistently".format(arg)) 
+
     def initialize_single_trigger_data_analysis_inputs(self):
         self.single_trigger_data_analysis_inputs = []
         self.single_trigger_likelihoods = []
@@ -156,6 +168,8 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             likelihood, priors = single_trigger_analysis.get_likelihood_and_priors()
             self.single_trigger_likelihoods.append(likelihood)
             self.single_trigger_priors.append(priors)
+
+        self._check_consistency_between_data_analysis_inputs(self.single_trigger_data_analysis_inputs)
 
     def parse_lensing_prior_dict(self):
         # Pre-process/convert the prior dict string
