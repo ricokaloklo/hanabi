@@ -6,7 +6,10 @@ def strongly_lensed_BBH_waveform(
     phi_12, a_2, tilt_2, phi_jl, theta_jn, phase, image_type, **kwargs
 ):
     frequency_domain_source_model = lal_binary_black_hole
-    image_type = int(image_type)
+    try:
+        image_type = int(image_type)
+    except:
+        image_type = 1 # Default is no phase shift
 
     """
     Type-I image: 0 phase shift
