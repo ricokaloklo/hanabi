@@ -5,7 +5,7 @@ def strongly_lensed_BBH_waveform(
     frequency_array, mass_1, mass_2, luminosity_distance, a_1, tilt_1,
     phi_12, a_2, tilt_2, phi_jl, theta_jn, phase, image_type, **kwargs
 ):
-    frequency_domain_source_model = kwargs.pop("frequency_domain_source_model", lal_binary_black_hole) # Default is lal_binary_black_hole
+    frequency_domain_source_model = lal_binary_black_hole
     image_type = int(image_type)
 
     """
