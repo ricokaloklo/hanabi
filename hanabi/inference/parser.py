@@ -1,4 +1,5 @@
 import bilby
+import parallel_bilby
 import bilby_pipe
 import bilby_pipe.bilbyargparser
 from bilby_pipe.parser import StoreBoolean
@@ -60,7 +61,7 @@ def _create_base_parser(prog, prog_version):
     base_parser.add(
         "--version",
         action="version",
-        version=f"%(prog)s={prog_version}\nbilby={bilby.__version__}\nbilby_pipe={bilby_pipe.__version__}"
+        version=f"%(prog)s={prog_version}\nbilby={bilby.__version__}\nbilby_pipe={bilby_pipe.__version__}\nparallel_bilby={parallel_bilby.__version__}"
     )
 
     return base_parser
