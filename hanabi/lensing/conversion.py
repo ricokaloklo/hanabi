@@ -88,6 +88,9 @@ def convert_to_lal_binary_black_hole_parameters_for_lensed_BBH(parameters):
                 converted_parameters['mass_2'] /\
                 converted_parameters['mass_ratio']
 
+    # Generate all mass parameters (now that we have mass_1 and mass_2)
+    converted_parameters = generate_mass_parameters(converted_parameters)
+
     for idx in ['1', '2']:
         key = 'chi_{}'.format(idx)
         if key in original_keys:
