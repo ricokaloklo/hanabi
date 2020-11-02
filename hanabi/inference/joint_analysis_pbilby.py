@@ -26,6 +26,7 @@ from dynesty import NestedSampler
 from pandas import DataFrame
 
 from .parser import create_joint_analysis_pbilby_parser
+from ..lensing.conversion import convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
 from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
 from parallel_bilby.utils import (
     fill_sample,
@@ -316,6 +317,10 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
                 )
                 self.single_trigger_likelihoods.append(likelihood)
 
+def conversion_function(sample):
+    out_sample, _ = convert_to_lal_binary_black_hole_parameters_for_lensed_BBH(sample)
+    return out_sample
+
 
 os.environ["OMP_NUM_THREADS"] = "1"
 os.environ["MKL_NUM_THREADS"] = "1"
@@ -332,7 +337,10 @@ outdir = input_args.outdir
 label = input_args.label
 likelihood, priors = analysis.get_likelihood_and_priors()
 # Make sure that priors is of PriorDict
-priors = bilby.core.prior.PriorDict(priors)
+priors = bilby.core.prior.PriorDict(
+    priors,
+    conversion_function=conversion_function,
+)
 
 def prior_transform_function(u_array):
     return priors.rescale(sampling_keys, u_array)
