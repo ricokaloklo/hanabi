@@ -11,7 +11,7 @@ from .utils import write_complete_config_file as _write_complete_config_file
 from .slurm_pbilby import setup_submit
 
 from .._version import __version__
-__prog__ = "hanabi_joint_generation_pbilby"
+__prog__ = "hanabi_joint_pipe_pbilby"
 
 logger = logging.getLogger(__prog__)
 
