@@ -151,16 +151,28 @@ class PowerLawRedshift(SourcePopulationPrior):
 
 class AnalyticalBBHMergerRateDensity(SourcePopulationPrior):
     def __init__(self, a_1, a_2, a_3, a_4, z_trunc):
-        self.a_1 = a_1
-        self.a_2 = a_2
-        self.a_3 = a_3
-        self.a_4 = a_4
-        self.z_trunc = z_trunc
+        super(AnalyticalBBHMergerRateDensity, self).__init__(
+            signal_parameter_names=['redshift'],
+            population_parameter_dict={
+                'a_1': a_1,
+                'a_2': a_2,
+                'a_3': a_3,
+                'a_4': a_4,
+                'z_trunc': z_trunc,
+            }
+        )
+
+        # The merger rate density fit has a unit of Gpc^-3 yr^-1
 
     def evaluate_fit(self, z):
-        if 0. <= z < self.z_trunc:
-            # Evaluate
-            return self.a_1 * np.exp(self.a_2*z) / (self.a_4 + np.exp(self.a_3*z))
+        a_1 = self.population_parameter_dict['a_1']
+        a_2 = self.population_parameter_dict['a_2']
+        a_3 = self.population_parameter_dict['a_3']
+        a_4 = self.population_parameter_dict['a_4']
+        z_trunc = self.population_parameter_dict['z_trunc']
+
+        if 0. <= z < z_trunc:
+            return a_1*np.exp(a_2*z)/(a_4 + np.exp(a_3*z))
         else:
             return 0.0
 
