@@ -148,3 +148,49 @@ class PowerLawRedshift(SourcePopulationPrior):
         # Since astropy.cosmology is using Mpc as the default unit
         return self.population_parameter_dict["R_0"] / 1e9 * T_obs * \
             self._PowerLawRedshift.normalisation(parameters={'lamb': self.population_parameter_dict["kappa"]})
+
+class AnalyticalBBHMergerRateDensity(SourcePopulationPrior):
+    def __init__(self, a_1, a_2, a_3, a_4, z_trunc):
+        self.a_1 = a_1
+        self.a_2 = a_2
+        self.a_3 = a_3
+        self.a_4 = a_4
+        self.z_trunc = z_trunc
+
+    def evaluate_fit(self, z):
+        if 0. <= z < self.z_trunc:
+            # Evaluate
+            R = self.a_1 * np.exp(self.a_2*z) / (self.a_4 + np.exp(self.a_3*z))
+            pass
+        else:
+            return 0.0
+
+class BelczynskiEtAl2017PopIPopIIStars(AnalyticalBBHMergerRateDensity):
+    def __init__(self):
+        super(BelczynskiEtAl2017PopIPopIIStars, self).__init__(
+            6.6e3,
+            1.6,
+            2.1,
+            30,
+            15
+        )
+
+class BelczynskiEtAl2017PopIIIStars(AnalyticalBBHMergerRateDensity):
+    def __init__(self):
+        super(BelczynskiEtAl2017PopIIIStars, self).__init__(
+            6e4,
+            1.0,
+            1.4,
+            3e6,
+            45
+        )
+
+class KinugawaEtAl2016PopIIIStars(AnalyticalBBHMergerRateDensity):
+    def __init__(self):
+        super(KinugawaEtAl2016PopIIIStars, self).__init__(
+            1e4,
+            0.7,
+            1.1,
+            500,
+            45
+        )   
