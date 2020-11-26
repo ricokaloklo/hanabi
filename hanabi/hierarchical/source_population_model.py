@@ -160,8 +160,7 @@ class AnalyticalBBHMergerRateDensity(SourcePopulationPrior):
     def evaluate_fit(self, z):
         if 0. <= z < self.z_trunc:
             # Evaluate
-            R = self.a_1 * np.exp(self.a_2*z) / (self.a_4 + np.exp(self.a_3*z))
-            pass
+            return self.a_1 * np.exp(self.a_2*z) / (self.a_4 + np.exp(self.a_3*z))
         else:
             return 0.0
 
