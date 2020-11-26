@@ -96,24 +96,7 @@ class UniformAlignedSpinComponent(SourcePopulationPrior):
         # z component from [-1, 1]
         return 0.25
 
-# Wrapper for gwpopulation's PowerLawRedshift
-class PowerLawRedshift(SourcePopulationPrior):
-    def __init__(self, R_0, kappa, redshift_max=2.3):
-        super(PowerLawRedshift, self).__init__(
-            signal_parameter_names=[
-                "redshift"
-            ],
-            population_parameter_dict={
-                'R_0': R_0,
-                'kappa': kappa,
-                'redshift_max': redshift_max
-            }
-        )
-
-        self._PowerLawRedshift = gwpopulation.models.redshift.PowerLawRedshift(
-            z_max=self.population_parameter_dict["redshift_max"]
-        )
-
+class MergerRateDensity(SourcePopulationPrior):
     def _parameter_conversion(self, dataset):
         if "luminosity_distance" in dataset.keys():
             # Calculate redshift from luminosity distance
@@ -129,6 +112,24 @@ class PowerLawRedshift(SourcePopulationPrior):
             raise ValueError("No distance measure in dataset")
 
         dataset["redshift"] = redshift
+
+# Wrapper for gwpopulation's PowerLawRedshift
+class PowerLawRedshift(MergerRateDensity):
+    def __init__(self, R_0, kappa, redshift_max=2.3):
+        super(PowerLawRedshift, self).__init__(
+            signal_parameter_names=[
+                "redshift"
+            ],
+            population_parameter_dict={
+                'R_0': R_0,
+                'kappa': kappa,
+                'redshift_max': redshift_max
+            }
+        )
+
+        self._PowerLawRedshift = gwpopulation.models.redshift.PowerLawRedshift(
+            z_max=self.population_parameter_dict["redshift_max"]
+        )
 
     def _prob(self, dataset):
         return self._PowerLawRedshift.probability(
@@ -149,7 +150,7 @@ class PowerLawRedshift(SourcePopulationPrior):
         return self.population_parameter_dict["R_0"] / 1e9 * T_obs * \
             self._PowerLawRedshift.normalisation(parameters={'lamb': self.population_parameter_dict["kappa"]})
 
-class AnalyticalBBHMergerRateDensity(SourcePopulationPrior):
+class AnalyticalBBHMergerRateDensity(MergerRateDensity):
     def __init__(self, a_1, a_2, a_3, a_4, redshift_max):
         super(AnalyticalBBHMergerRateDensity, self).__init__(
             signal_parameter_names=['redshift'],
