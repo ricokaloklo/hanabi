@@ -177,7 +177,7 @@ class AnalyticalBBHMergerRateDensity(SourcePopulationPrior):
         else:
             return 0.0
 
-class BelczynskiEtAl2017PopIPopIIStars(AnalyticalBBHMergerRateDensity):
+class BelczynskiEtAl2017PopIPopIIStarsBBHMergerRateDensity(AnalyticalBBHMergerRateDensity):
     def __init__(self):
         super(BelczynskiEtAl2017PopIPopIIStars, self).__init__(
             6.6e3,
@@ -187,7 +187,7 @@ class BelczynskiEtAl2017PopIPopIIStars(AnalyticalBBHMergerRateDensity):
             15
         )
 
-class BelczynskiEtAl2017PopIIIStars(AnalyticalBBHMergerRateDensity):
+class BelczynskiEtAl2017PopIIIStarsBBHMergerRateDensity(AnalyticalBBHMergerRateDensity):
     def __init__(self):
         super(BelczynskiEtAl2017PopIIIStars, self).__init__(
             6e4,
@@ -197,7 +197,7 @@ class BelczynskiEtAl2017PopIIIStars(AnalyticalBBHMergerRateDensity):
             45
         )
 
-class KinugawaEtAl2016PopIIIStars(AnalyticalBBHMergerRateDensity):
+class KinugawaEtAl2016PopIIIStarsBBHMergerRateDensity(AnalyticalBBHMergerRateDensity):
     def __init__(self):
         super(KinugawaEtAl2016PopIIIStars, self).__init__(
             1e4,
