@@ -1,7 +1,7 @@
 import numpy as np
 import bilby.gw.conversion
 import gwpopulation
-from .source_population_model import SourcePopulationModel
+from .source_population_model import SourcePopulationModel, Marginalized
 
 class MergerRateDensity(SourcePopulationModel):
     def __init__(self, population_parameter_dict):
@@ -25,6 +25,10 @@ class MergerRateDensity(SourcePopulationModel):
             raise ValueError("No distance measure in dataset")
 
         dataset["redshift"] = redshift
+
+class MarginalizedMergerRateDensity(Marginalized):
+    def total_number_of_mergers(self, T_obs):
+        return 1.0
 
 # Wrapper for gwpopulation's PowerLawRedshift
 class PowerLawRedshift(MergerRateDensity):

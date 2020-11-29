@@ -42,11 +42,6 @@ class Marginalized(SourcePopulationModel):
 
     def prob(self, dataset):
         return 1.0
-
-
-class MarginalizedMergerRateDensity(Marginalized):
-    def total_number_of_mergers(self, T_obs):
-        return 1.0
  
 
 # Wrapper for gwpopulation's power_law_primary_mass_ratio
