@@ -16,7 +16,8 @@ class SourcePopulationModel(object):
 
     def _parameter_conversion(self, dataset):
         # Implement a parameter conversion function
-        return dataset
+        # NOTE pandas dataframe is edited *in-place*
+        pass
 
     def prob(self, dataset):
         if not self._check_if_keys_exist(names=self.signal_parameter_names, keys=dataset.keys()):
