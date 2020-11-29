@@ -19,9 +19,10 @@ class SelectionFunction(object):
     def expected_number_of_mergers(self, T_obs, IFAR_threshold=1):
         return 1.0
 
-    def evaluate(self, T_obs, IFAR_threshold=1):
-        N_tot = self.merger_rate_density_src_pop_model.total_number_of_mergers(T_obs)
-        N_exp = self.expected_number_of_mergers(T_obs, IFAR_threshold=IFAR_threshold)
+    def evaluate(self, IFAR_threshold=1):
+        # T_obs does not matter in evaluating the selection function
+        N_tot = self.merger_rate_density_src_pop_model.total_number_of_mergers(1.0)
+        N_exp = self.expected_number_of_mergers(1.0, IFAR_threshold=IFAR_threshold)
 
         return N_exp/N_tot
 
