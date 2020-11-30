@@ -101,7 +101,7 @@ class AnalyticalBBHMergerRateDensity(MergerRateDensity):
         a_4 = self.population_parameter_dict['a_4']
         redshift_max = self.population_parameter_dict['redshift_max']
 
-        return a_1*np.exp(a_2*z)/(a_4 + np.exp(a_3*z))*((z >= 0.0) & (z < redshift_max))
+        return np.nan_to_num(a_1*np.exp(a_2*z)/(a_4 + np.exp(a_3*z))*((z >= 0.0) & (z < redshift_max)))
 
 class BelczynskiEtAl2017PopIPopIIStarsBBHMergerRateDensity(AnalyticalBBHMergerRateDensity):
     def __init__(self):
