@@ -24,7 +24,7 @@ class SourcePopulationModel(object):
             # Parameters needed for evaluation does not exist
             self._parameter_conversion(dataset)
 
-        return self._prob(dataset).to_numpy().flatten()
+        return self._prob(dataset)
 
     def _prob(self, dataset):
         raise NotImplementedError
