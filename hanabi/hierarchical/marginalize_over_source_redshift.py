@@ -32,23 +32,3 @@ class LensedSourceRedshiftProbDist(SourcePopulationModel):
 class NotLensedSourceRedshiftProbDist(LensedSourceRedshiftProbDist):
     def prob(self, dataset):
         return (1.0/self.normalization) * (1.0 - self.optical_depth.evaluate(dataset["redshift"])) * self.merger_rate_density.prob(dataset)
-
-class Marginalization(object):
-    def __init__(
-        self,
-        result_file,
-        mass_src_model=Marginalized(),
-        spin_src_model=Marginalized(),
-        merger_rate_density_src_pop_model=MarginalizedMergerRateDensity()
-    ):
-        self.result = bilby.result.read_in_result(result_file)
-        self.mass_src_model = mass_src_model
-        self.spin_src_model = spin_src_model
-        self.merger_rate_density_src_pop_model = merger_rate_density_src_pop_model
-
-    def marginalize_over_params(self):
-        pass
-
-class MarginalizationWithMagnification(Marginalization):
-    def marginalize_over_abs_magnification(self):
-        pass
