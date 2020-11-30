@@ -25,9 +25,13 @@ class LensedSourceRedshiftProbDist(SourcePopulationModel):
         return (1.0/self.normalization) * self.optical_depth.evaluate(dataset["redshift"]) * self.merger_rate_density.prob(dataset)
 
     def compute_normalization(self):
-        zs = np.linspace(0., self.population_parameter_dict["redshift_max"], num=100000)
+        zs = np.arange(0., self.population_parameter_dict["redshift_max"], step=0.1)
         out = scipy.integrate.simps(self.prob(pd.DataFrame({'redshift': zs})), zs)
         return out
+
+class NotLensedSourceRedshiftProbDist(LensedSourceRedshiftProbDist):
+    def prob(self, dataset):
+        return (1.0/self.normalization) * (1.0 - self.optical_depth.evaluate(dataset["redshift"])) * self.merger_rate_density.prob(dataset)
 
 class Marginalization(object):
     def __init__(
