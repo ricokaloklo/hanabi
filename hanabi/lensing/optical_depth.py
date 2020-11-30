@@ -25,11 +25,22 @@ class TurnerEtAl1984OpticalDepth(OpticalDepth):
 
     def evaluate(self, z):
         d_C = self.cosmology.comoving_distance(z).to('Gpc').value
-        return norm*(d_C)**3
+        return self.norm*(d_C)**3
 
-class HannukselaEtAl2019OpticalDepth(TurnerEtAlOpticalDepth):
+class HannukselaEtAl2019OpticalDepth(TurnerEtAl1984OpticalDepth):
     def __init__(self):
         super(HannukselaEtAl2019OpticalDepth, self).__init__(
             0.0017/(Planck15.hubble_distance.to('Gpc').value**3),
             cosmo=Planck15
+        )
+
+class HarisEtAl2018OpticalDepth(TurnerEtAl1984OpticalDepth):
+    def __init__(self):
+        cosmo=astropy.cosmology.FlatLambdaCDM(
+            70,
+            1-0.7
+        )
+        super(HarisEtAl2018OpticalDepth, self).__init__(
+            4.17e-6,
+            cosmo=cosmo
         )
