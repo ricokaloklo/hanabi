@@ -2,10 +2,8 @@
 # evluate p(lensed|z_src)
 # evaluate p(z_src|lensed) \propto p(lensed|z_src) * p(z_src)/p(lensed)
 import numpy as np
-import scipy.integrate
 import astropy.cosmology
 from astropy.cosmology import Planck15
-from astropy import units as u
 
 class OpticalDepth(object):
     def __init__(self):
@@ -17,35 +15,21 @@ class OpticalDepth(object):
 class OpticalDepthFromFile(object):
     pass
 
-class TurnerEtAlOpticalDepth(OpticalDepth):
+class TurnerEtAl1984OpticalDepth(OpticalDepth):
     """
-    Analytical model from Turner, Ostriker & Gott 1984, Fukugita & Turner 1991
+    Analytical model from Turner, Ostriker & Gott 1984
     """
     def __init__(self, norm, cosmo=Planck15):
         self.norm = norm
         self.cosmology = cosmo
 
     def evaluate(self, z):
-        D_c = self.cosmology.comoving_transverse_distance(z).to(u.Gpc)
-        return norm*(D_c)**3
+        d_C = self.cosmology.comoving_distance(z).to('Gpc').value
+        return norm*(d_C)**3
 
-class NgEtAlOpticalDepth(TurnerEtAlOpticalDepth):
+class HannukselaEtAl2019OpticalDepth(TurnerEtAlOpticalDepth):
     def __init__(self):
-        super(NgEtAlOpticalDepth, self).__init__(
-            4.17e-6/6.3,
-            cosmo=astropy.cosmology.FlatLambdaCDM(
-                70,
-                1-0.7
-            )
+        super(HannukselaEtAl2019OpticalDepth, self).__init__(
+            0.0017/(Planck15.hubble_distance.to('Gpc').value**3),
+            cosmo=Planck15
         )
-
-class HarisEtAlOpticalDepth(TurnerEtAlOpticalDepth):
-    def __init__(self):
-        super(HarisEtAlOpticalDepth, self).__init__(
-            4.17e-6,
-            cosmo=astropy.cosmology.FlatLambdaCDM(
-                70,
-                1-0.7
-            )
-        )
-
