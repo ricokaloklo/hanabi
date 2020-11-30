@@ -1,6 +1,3 @@
-# optical_depth.py
-# evluate p(lensed|z_src)
-# evaluate p(z_src|lensed) \propto p(lensed|z_src) * p(z_src)/p(lensed)
 import numpy as np
 import astropy.cosmology
 from astropy.cosmology import Planck15
