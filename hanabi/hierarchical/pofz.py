@@ -21,7 +21,7 @@ class LensedSourceRedshiftProbDist(SourcePopulationModel):
         self.normalization = 1.0
         self.normalization = self.compute_normalization()
 
-    def prob(self, dataset):
+    def _prob(self, dataset):
         return (1.0/self.normalization) * self.optical_depth.evaluate(dataset["redshift"]) * self.merger_rate_density.prob(dataset)
 
     def compute_normalization(self):
@@ -30,5 +30,5 @@ class LensedSourceRedshiftProbDist(SourcePopulationModel):
         return out
 
 class NotLensedSourceRedshiftProbDist(LensedSourceRedshiftProbDist):
-    def prob(self, dataset):
+    def _prob(self, dataset):
         return (1.0/self.normalization) * (1.0 - self.optical_depth.evaluate(dataset["redshift"])) * self.merger_rate_density.prob(dataset)
