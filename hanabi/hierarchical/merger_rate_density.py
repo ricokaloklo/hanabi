@@ -1,7 +1,9 @@
 import numpy as np
 import bilby.gw.conversion
-import gwpopulation
+import pandas as pd
+import scipy.integrate
 from .source_population_model import SourcePopulationModel, Marginalized
+from astropy.cosmology import Planck15
 
 class MergerRateDensity(SourcePopulationModel):
     def __init__(self, population_parameter_dict):
@@ -9,26 +11,23 @@ class MergerRateDensity(SourcePopulationModel):
             signal_parameter_names=["redshift"],
             population_parameter_dict=population_parameter_dict
         )
-
-        if "redshift_max" in self.population_parameter_dict.keys():
-            # Initialize a Redshift object from gwpopulation
-            self._Redshift = gwpopulation.models.redshift._Redshift(
-                z_max=self.population_parameter_dict["redshift_max"]
-            )
-            self._Redshift.psi_of_z = self.psi_of_z
-            # Evaluate dVc/dz once and only once!
-            self._Redshift._cache_dvc_dz(self._Redshift.zs)
-
-    def psi_of_z(self, redshift, **parameters):
-        return self.evaluate(redshift)/self.population_parameter_dict["R_0"]
+        self.cosmology = Planck15
+        assert "redshift_max" in population_parameter_dict.keys(), "redshift_max must be given"
+        self.normalization = 1.0
+        self.normalization = self.compute_normalization()
 
     def evaluate(self, z):
         raise NotImplementedError
 
     def _prob(self, dataset):
-        return self._Redshift.probability(
-            dataset=dataset
-        )
+        # NOTE astropy.cosmology, by default, uses Mpc as the unit
+        dVc_dz = 4.0*np.pi*self.cosmology.differential_comoving_volume(dataset["redshift"]).to('Gpc^3/sr').value
+        return (1.0/self.normalization) * (1.0/(1.0 + dataset["redshift"])) * self.evaluate(dataset["redshift"]) * dVc_dz
+
+    def compute_normalization(self):
+        zs = np.arange(0, self.population_parameter_dict["redshift_max"], step=1e-3)
+        out = scipy.integrate.simps(self._prob(pd.DataFrame({'redshift': zs})), zs)
+        return out
 
     def _parameter_conversion(self, dataset):
         if "luminosity_distance" in dataset.keys():
@@ -47,18 +46,12 @@ class MergerRateDensity(SourcePopulationModel):
         dataset["redshift"] = redshift
 
     def ln_dN_over_dz(self, dataset):
-        # NOTE This is not a normalized probability
-        return np.log(self.population_parameter_dict["R_0"] / 1e9) + np.log(
-            self._Redshift.differential_spacetime_volume(
-                dataset=dataset
-            )
-        )
+        # NOTE This is *NOT* a normalized probability
+        return np.log(self._prob(dataset)*self.normalization)
 
     def total_number_of_mergers(self, T_obs):
         # R_0 is in the unit of Gpc^-3 T_obs^-1
-        # Since astropy.cosmology is using Mpc as the default unit
-        return self.population_parameter_dict["R_0"] / 1e9 * T_obs * \
-            self._Redshift.normalisation(parameters={})
+        return T_obs*self.normalization
 
 
 class MarginalizedMergerRateDensity(Marginalized):
