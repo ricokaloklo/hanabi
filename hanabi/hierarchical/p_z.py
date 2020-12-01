@@ -28,7 +28,7 @@ class LensedSourceRedshiftProbDist(SourcePopulationModel):
     def sample(self):
         # Draw sample using empirical supremum rejection sampling
         out = None
-        c_hat = 10 # Initial guess for the supermum
+        c_hat = 10 # Initial guess for the supremum
         while out is None:
             proposed_pt = np.random.uniform(0., self.population_parameter_dict["redshift_max"])
             u = np.random.random()
