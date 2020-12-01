@@ -32,7 +32,7 @@ class LensedSourceRedshiftProbDist(SourcePopulationModel):
         while out is None:
             proposed_pt = np.random.uniform(0., self.population_parameter_dict["redshift_max"])
             u = np.random.random()
-            pdf_ev = self._prob(pd.DataFrame({'redshift': [proposed_pt]}))[0]
+            pdf_ev = self._prob({'redshift': proposed_pt})
             if u <= pdf_ev/(c_hat/self.population_parameter_dict["redshift_max"]):
                 out = proposed_pt
             c_hat = max(c_hat, pdf_ev/(1./self.population_parameter_dict["redshift_max"]))
@@ -41,7 +41,7 @@ class LensedSourceRedshiftProbDist(SourcePopulationModel):
 
     def cdf(self, z_upper):
         zs = np.linspace(0., z_upper, num=1000)
-        out = scipy.integrate.simps(self.prob(pd.DataFrame({'redshift': zs})), zs)
+        out = scipy.integrate.simps(self.prob({'redshift': zs}), zs)
         return out
 
     def compute_normalization(self):
