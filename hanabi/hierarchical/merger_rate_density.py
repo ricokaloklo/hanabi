@@ -16,6 +16,8 @@ class MergerRateDensity(SourcePopulationModel):
                 z_max=self.population_parameter_dict["redshift_max"]
             )
             self._Redshift.psi_of_z = self.psi_of_z
+            # Evaluate dVc/dz once and only once!
+            self._Redshift._cache_dvc_dz(self._Redshift.zs)
 
     def psi_of_z(self, redshift, **parameters):
         return self.evaluate(redshift)/self.population_parameter_dict["R_0"]
