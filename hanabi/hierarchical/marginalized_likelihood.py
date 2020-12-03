@@ -2,6 +2,7 @@ import bilby
 from .utils import get_ln_weights_for_reweighting
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Prior, PriorDict
+from scipy.special import logsumexp
 
 class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
     def __init__(self, abs_magnification_prob_dist, z_src, name=None, latex_label=None, unit=None):
@@ -31,10 +32,7 @@ class DetectorFrameComponentMassesFromSourceFrame(dict):
         return np.power((1. + self.z_src), -2)
 
     def prob(self, dataset):
-        mass_1_src = dataset["mass_1"] / (1. + self.z_src)
-        mass_2_src = dataset["mass_2"] / (1. + self.z_src)
-
-        return self.mass_src_pop_model.prob({'mass_1_source': mass_1_src, 'mass_2_source': mass_2_src})
+        return self.mass_src_pop_model.prob({k+"_source": dataset[k]/(1.+self.z_src) for k in ["mass_1", "mass_2"]})
 
     def ln_prob(self, dataset):
         return np.log(self.prob(dataset))
@@ -80,5 +78,22 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
 
         return get_ln_weights_for_reweighting(self.result, old_priors, new_priors, parameters)
 
+    def compute_ln_weights_for_component_masses(self, z_src):
+        det_frame_priors = DetectorFrameComponentMassesFromSourceFrame(
+            self.mass_src_pop_model,
+            z_src=z_src
+        )
+
+        old_priors = PriorDict(dictionary={
+            k: self.result.priors[k] for k in ["mass_1", "mass_2"]
+        })
+
+        return get_ln_weights_for_reweighting(self.result, old_priors, det_frame_priors, ["mass_1", "mass_2"])
+
     def log_likelihood(self):
         z_src = self.parameters["redshift"]
+        ln_weights = self.compute_ln_weights_for_component_masses(z_src) + \
+            self.compute_ln_weights_for_luminosity_distances(z_src)
+        ln_Z = self.result.log_evidence + logsumexp(ln_weights) - np.log(len(self.result.posterior))
+
+        return ln_Z
