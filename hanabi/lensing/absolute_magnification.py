@@ -1,19 +1,14 @@
 import numpy as np
-from bilby.core.prior import PowerLaw
+from bilby.core.prior import *
 
-class AbsoluteMagnificationProbDist(object):
-    def __init__(self):
-        pass
-
-    def prob(self, mu_abs):
-        return NotImplementedError
-
-    def ln_prob(self, mu_abs):
-        return np.log(self.prob(mu_abs))
-
-class PowerLawAbsoluteMagnificationProbDist(AbsoluteMagnificationProbDist):
-    def __init__(self, mu_abs_min=2):
-        self._PowerLaw = PowerLaw(-3, mu_abs_min, np.inf)
-
-    def prob(self, mu_abs):
-        return self._PowerLaw.prob(mu_abs)
+class SISPowerLawAbsoluteMagnification(PowerLaw):
+    def __init__(self, name=None, latex_label=None, unit=None, boundary=None):
+        super(SISPowerLawAbsoluteMagnification, self).__init__(
+            alpha=-3,
+            minimum=2,
+            maximum=np.inf,
+            name=name,
+            unit=unit,
+            latex_label=latex_label,
+            boundary=boundary
+        )
