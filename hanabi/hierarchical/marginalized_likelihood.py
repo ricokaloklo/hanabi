@@ -1,3 +1,4 @@
+import numpy as np
 import bilby
 from .utils import get_ln_weights_for_reweighting
 from bilby.core.likelihood import Likelihood
