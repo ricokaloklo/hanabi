@@ -29,16 +29,6 @@ def create_parser(prog):
         default=False,
         help="Reweight the result to follow a uniform-in-comoving-volume prior in luminosity distance"
     )
-    parser.add(
-        "--convert-to-relative-magnification",
-        action="store_true",
-        default=False,
-        help=(
-            "Reweight the result with luminosity distances being sampled independently"
-            "to relative magnification following the poor man's prior."
-            "Note that the prior used during sampling must be PowerLaw with exponent of 2 (d_L^2)"
-        )
-    )
 
     return parser
 
