@@ -14,4 +14,4 @@ def get_weights_for_reweighting(result, old_priors, new_priors, parameters):
         new_log_prior_array[idx] = new_priors.ln_prob(par_sample)
 
     ln_weights = new_log_prior_array - old_log_prior_array
-    return ln_weights
+    return np.exp(ln_weights)
