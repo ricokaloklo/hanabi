@@ -16,7 +16,7 @@ class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
         self.z_src = z_src
         self.d_L_src = bilby.gw.conversion.redshift_to_luminosity_distance(z_src)
 
-    def Jacobian(self, d_L):  
+    def Jacobian(self, d_L):
         return 2.0 * (self.d_L_src/d_L)**2 * (1./d_L)
 
     def prob(self, d_L):
