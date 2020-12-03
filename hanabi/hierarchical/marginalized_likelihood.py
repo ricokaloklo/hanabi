@@ -31,11 +31,8 @@ class DetectorFrameComponentMassesFromSourceFrame(dict):
         return np.power((1. + self.z_src), -2)
 
     def prob(self, dataset):
-        mass_1_det = dataset["mass_1"]
-        mass_2_det = dataset["mass_2"]
-
-        mass_1_src = mass_1_det / (1. + self.z_src)
-        mass_2_src = mass_2_det / (1. + self.z_src)
+        mass_1_src = dataset["mass_1"] / (1. + self.z_src)
+        mass_2_src = dataset["mass_2"] / (1. + self.z_src)
 
         return self.mass_src_pop_model.prob({'mass_1_source': mass_1_src, 'mass_2_source': mass_2_src})
 
@@ -60,8 +57,28 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
             self.suffix = suffix
 
     def compute_ln_weights_for_luminosity_distances(self, z_src):
-        for trigger_idx, abs_magnification_prob_dist in enumerate(self.abs_magnification_prob_dists):
-            pass
+        # Construct the prior dicts for apparent luminosity distance
+        new_priors = {}
+        old_priors = {}
+        parameters = []
+
+        for trigger_idx, abs_magn in enumerate(self.abs_magnification_prob_dists):
+            parameter_name = "luminosity_distance"+self.suffix(trigger_idx)
+            parameters.append(parameter_name)
+            new_priors[parameter_name] = \
+                LuminosityDistancePriorFromAbsoluteMagnificationRedshift(
+                    abs_magnification_prob_dist=abs_magn,
+                    z_src=z_src,
+                    name=parameter_name,
+                    unit="Mpc",
+                )
+            old_priors[parameter_name] = \
+                self.result.priors[parameter_name]
+
+        new_priors = PriorDict(dictionary=new_priors)
+        old_priors = PriorDict(dictionary=old_priors)
+
+        return get_ln_weights_for_reweighting(self.result, old_priors, new_priors, parameters)
 
     def log_likelihood(self):
         z_src = self.parameters["redshift"]
