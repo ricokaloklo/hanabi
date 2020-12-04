@@ -19,17 +19,17 @@ class SourcePopulationModel(object):
         # NOTE pandas dataframe is edited *in-place*
         pass
 
-    def prob(self, dataset):
+    def prob(self, dataset, axis=None):
         if not self._check_if_keys_exist(names=self.signal_parameter_names, keys=dataset.keys()):
             # Parameters needed for evaluation does not exist
             self._parameter_conversion(dataset)
 
         return self._prob(dataset)
 
-    def _prob(self, dataset):
+    def _prob(self, dataset, axis=None):
         raise NotImplementedError
 
-    def ln_prob(self, dataset):
+    def ln_prob(self, dataset, axis=None):
         return np.log(self.prob(dataset))
 
 
@@ -40,7 +40,7 @@ class Marginalized(SourcePopulationModel):
     def _check_if_keys_exist(names, keys):
         return True
 
-    def prob(self, dataset):
+    def prob(self, dataset, axis=None):
         return 1.0
  
 
@@ -69,7 +69,7 @@ class PowerLawPrimaryMassRatio(SourcePopulationModel):
             )
             dataset["mass_ratio"] = mass_ratio
 
-    def _prob(self, dataset):
+    def _prob(self, dataset, axis=None):
         return gwpopulation.models.mass.power_law_primary_mass_ratio(
             {"mass_1": dataset["mass_1_source"], "mass_ratio": dataset["mass_ratio"]},
             self.population_parameter_dict["alpha"],
@@ -88,6 +88,6 @@ class UniformAlignedSpinComponent(SourcePopulationModel):
             population_parameter_dict={}
         )
 
-    def prob(self, dataset):
+    def prob(self, dataset, axis=None):
         # z component from [-1, 1]
         return 0.25
