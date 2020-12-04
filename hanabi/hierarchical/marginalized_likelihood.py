@@ -43,6 +43,8 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         # The likelihood is a function of the source redshift only
         # Might as well do this marginalization deterministically
         self.parameters = {'redshift': 0.0}
+        self._meta_data = None
+        self._marginalized_parameters = []
         self.result = result
         self.mass_src_pop_model = mass_src_pop_model
         self.spin_src_pop_model = spin_src_pop_model
