@@ -33,7 +33,7 @@ class DetectorFrameComponentMassesFromSourceFrame(dict):
         return np.power((1. + self.z_src), -2)
 
     def prob(self, dataset):
-        return self.mass_src_pop_model.prob({k+"_source": dataset[k]/(1.+self.z_src) for k in ["mass_1", "mass_2"]})
+        return self.mass_src_pop_model.prob({k+"_source": dataset[k]/(1.+self.z_src) for k in ["mass_1", "mass_2"]})*self.Jacobian()
 
     def ln_prob(self, dataset):
         return np.log(self.prob(dataset))
