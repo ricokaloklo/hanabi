@@ -16,16 +16,28 @@ class LensedSourceRedshiftProbDist(Interped):
 
         self.zs = np.linspace(0., self.redshift_max, num=1000)
         self.compute_normalization()
-        pdfs = self._prob(self.zs)
+        self.pdfs = self._prob(self.zs)
 
         super(LensedSourceRedshiftProbDist, self).__init__(
             self.zs,
-            pdfs,
+            self.pdfs,
             minimum=0.,
             maximum=self.redshift_max,
             name=name,
             latex_label=latex_label,
         )
+
+    def to_json(self):
+        # Return the (reconstructed) interpolated prior
+        interped_prior = Interped(
+            self.zs,
+            self.pdfs,
+            minimum=0.,
+            maximum=self.redshift_max,
+            name=self.name,
+            latex_label=self.latex_label,
+        )
+        return interped_prior.to_json()
 
     def _prob(self, z):
         return (1.0/self.normalization) * self.optical_depth.evaluate(z) * self.merger_rate_density.prob({"redshift": z})
