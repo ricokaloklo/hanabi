@@ -8,6 +8,7 @@ from bilby_pipe.bilbyargparser import BilbyArgParser
 from bilby_pipe.utils import parse_args
 import configargparse
 import logging
+from .utils import setup_logger
 
 __prog__ = "hanabi_postprocess_result"
 
