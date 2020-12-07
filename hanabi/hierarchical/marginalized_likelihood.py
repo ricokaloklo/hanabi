@@ -1,7 +1,7 @@
 import numpy as np
 import bilby
 from .utils import get_ln_weights_for_reweighting
-from ..lensing.utils import parameter_suffix
+from ..lensing.utils import ParameterSuffix
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Prior, PriorDict
 from scipy.special import logsumexp
@@ -54,7 +54,7 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
 
         self.sep_char = sep_char
         if suffix is None:
-            self.suffix = parameter_suffix
+            self.suffix = ParameterSuffix(self.sep_char)
         else:
             self.suffix = suffix
 
