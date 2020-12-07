@@ -24,7 +24,7 @@ class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
         return self.abs_magnification_prob_dist.prob(mu_abs)*self.Jacobian(d_L)
 
 # NOTE This is not a full-blown bilby PriorDict but it does the job!
-class DetectorFrameComponentMassesFromSourceFrame(dict):
+class DetectorFrameComponentMassesFromSourceFrame(object):
     def __init__(self, mass_src_pop_model, z_src):
         self.mass_src_pop_model = mass_src_pop_model
         self.z_src = z_src
@@ -33,10 +33,10 @@ class DetectorFrameComponentMassesFromSourceFrame(dict):
         return np.power((1. + self.z_src), -2)
 
     def prob(self, dataset, axis=None):
-        return self.mass_src_pop_model.prob({k+"_source": dataset[k]/(1.+self.z_src) for k in ["mass_1", "mass_2"]})*self.Jacobian()
+        return self.mass_src_pop_model.prob({k+"_source": dataset[k]/(1.+self.z_src) for k in ["mass_1", "mass_2"]}, axis=axis)*self.Jacobian()
 
     def ln_prob(self, dataset, axis=None):
-        return np.log(self.prob(dataset))
+        return np.log(self.prob(dataset, axis=axis))
 
 class MonteCarloMarginalizedLikelihood(Likelihood):
     def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, sep_char="^", suffix=None):
