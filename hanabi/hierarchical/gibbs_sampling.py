@@ -4,7 +4,7 @@ import pandas as pd
 from schwimmbad import SerialPool, MultiPool
 
 class CustomCollapsedBlockedGibbsSampler(object):
-    def __init__(self, redshift_result, marginalized_likelihood, random_seed=1234, pool=None:):
+    def __init__(self, redshift_result, marginalized_likelihood, random_seed=1234, pool=None):
         self.redshift_result = redshift_result
         self.marginalized_likelihood = marginalized_likelihood
         self.random_seed = random_seed
@@ -28,10 +28,10 @@ class CustomCollapsedBlockedGibbsSampler(object):
     def draw_one_joint_posterior_sample(self):
         try:
             z_drawn = self.draw_from_redshift_posterior()
-            return (z_drawn, draw_from_inference_posterior_given_redshift(z_drawn))
+            return (z_drawn, self.draw_from_inference_posterior_given_redshift(z_drawn))
         except:
             # The redshift drawn in this trial leads to no posterior samples after rejection sampling
-            return self.draw_joint_posterior_samples()
+            return self.draw_one_joint_posterior_sample()
 
     def draw_one_joint_posterior_sample_map(self, idx):
         np.random.seed(self.random_seed+idx)
