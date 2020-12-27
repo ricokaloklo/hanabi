@@ -53,7 +53,10 @@ class JointAnalysisNode(Node):
                     self.extra_lines.extend(
                         self._condor_file_transfer_lines(
                             input_files_to_transfer,
-                            [self._relative_topdir(single_trigger_pe_input.outdir, self.joint_main_input.initialdir)],
+                            [
+                                self._relative_topdir(single_trigger_pe_input.outdir, self.joint_main_input.initialdir),
+                                self._relative_topdir(self.joint_main_input.outdir, self.joint_main_input.initialdir),
+                            ],
                         )
                     )
                     self.arguments.add("outdir", os.path.basename(self.joint_main_input.outdir))
