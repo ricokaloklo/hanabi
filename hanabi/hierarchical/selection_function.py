@@ -73,8 +73,8 @@ class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
         # Actually compute the log of expected number
         log_dN = np.where(
             detected,
-            self.mass_src_pop_model.ln_prob(self.pop_inj_info, axis=0) + \
-            self.spin_src_pop_model.ln_prob(self.pop_inj_info, axis=0) + \
+            self.mass_src_pop_model.ln_prob(self.pop_inj_info[["mass_1_source", "mass_2_source"]], axis=0) + \
+            self.spin_src_pop_model.ln_prob(self.pop_inj_info[["spin_1z", "spin_2z"]], axis=0) + \
             self.merger_rate_density_src_pop_model.ln_dN_over_dz(self.pop_inj_info),
             np.NINF
         )
