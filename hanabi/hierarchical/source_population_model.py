@@ -78,6 +78,41 @@ class PowerLawPrimaryMassRatio(SourcePopulationModel):
             self.population_parameter_dict["mmax"]
         )
 
+class PowerLawComponentMass(SourcePopulationModel):
+    def __init__(self, alpha, beta, mmin, mmax):
+        super(PowerLawComponentMass, self).__init__(
+            signal_parameter_names=[
+                "mass_1_source",
+                "mass_2_source",
+            ],
+            population_parameter_dict={
+                "alpha": alpha,
+                "beta": beta,
+                "mmin": mmin,
+                "mmax": mmax,
+            }
+        )
+        
+    def prob(self, dataset):
+        return self.ln_prob(self, dataset)
+    
+    def ln_prob(self, dataset):
+        alpha = self.population_parameter_dict["alpha"]
+        beta = self.population_parameter_dict["beta"]
+        mmin = self.population_parameter_dict["mmin"]
+        mmax = self.population_parameter_dict["mmax"]
+        m1 = dataset["mass_1_source"]
+        m2 = dataset["mass_2_source"]
+        
+        m1_norm = (1-alpha)/(mmax**(1-alpha) - mmin**(1-alpha))
+        m2_norm = (1+beta)/(m1**(1+beta) - mmin**(1+beta))
+    
+        log_pm1 = -alpha*np.log(m1) + np.log(m1_norm)
+        log_pm2 = beta*np.log(m2) + np.log(m2_norm)
+        
+        return np.where((m2 < m1) & (mmin < m2) & (m1 < mmax), log_pm1 + log_pm2, np.NINF)
+
+
 class UniformAlignedSpinComponent(SourcePopulationModel):
     def __init__(self):
         super(UniformAlignedSpinComponent, self).__init__(
