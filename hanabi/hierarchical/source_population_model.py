@@ -93,10 +93,10 @@ class PowerLawComponentMass(SourcePopulationModel):
             }
         )
         
-    def prob(self, dataset, axis=None):
-        return self.ln_prob(self, dataset)
+    def _prob(self, dataset, axis=None):
+        return np.exp(self._ln_prob(dataset, axis=axis))
     
-    def ln_prob(self, dataset, axis=None):
+    def _ln_prob(self, dataset, axis=None):
         alpha = self.population_parameter_dict["alpha"]
         beta = self.population_parameter_dict["beta"]
         mmin = self.population_parameter_dict["mmin"]
