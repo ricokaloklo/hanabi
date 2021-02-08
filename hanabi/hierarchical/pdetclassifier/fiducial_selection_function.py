@@ -37,7 +37,7 @@ class Fixed(object):
 
 # Setting up the population and lensing model
 mmin = 5
-mmax = 100
+mmax = 41
 intrinsic_pop_models = {
 	"m1_src": bilby.core.prior.Uniform(minimum=mmin, maximum=mmax),
 	"m2_src": bilby.core.prior.Uniform(minimum=mmin, maximum=mmax),
