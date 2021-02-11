@@ -99,3 +99,5 @@ setup_logger("hanabi_joint_analysis")
 setup_logger("hanabi_joint_generation_pbilby")
 # Initialize a logger for hanabi_joint_analysis_pbilby
 setup_logger("hanabi_joint_analysis_pbilby")
+# Initialize a logger for hanabi_postprocess_result
+setup_logger("hanabi_postprocess_result")

@@ -2,7 +2,8 @@ import os
 import numpy as np
 import h5py
 import pandas as pd
-from .source_population_model import Marginalized, MarginalizedMergerRateDensity
+from .source_population_model import Marginalized
+from .merger_rate_density import MarginalizedMergerRateDensity
 
 class SelectionFunction(object):
     def __init__(
@@ -18,9 +19,10 @@ class SelectionFunction(object):
     def expected_number_of_mergers(self, T_obs, IFAR_threshold=1):
         return 1.0
 
-    def evaluate(self, T_obs, IFAR_threshold=1):
-        N_tot = self.merger_rate_density_src_pop_model.total_number_of_mergers(T_obs)
-        N_exp = self.expected_number_of_mergers(T_obs, IFAR_threshold=IFAR_threshold)
+    def evaluate(self, IFAR_threshold=1):
+        # T_obs does not matter in evaluating the selection function
+        N_tot = self.merger_rate_density_src_pop_model.total_number_of_mergers(1.0)
+        N_exp = self.expected_number_of_mergers(1.0, IFAR_threshold=IFAR_threshold)
 
         return N_exp/N_tot
 
@@ -71,8 +73,8 @@ class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
         # Actually compute the log of expected number
         log_dN = np.where(
             detected,
-            self.mass_src_pop_model.ln_prob(self.pop_inj_info) + \
-            self.spin_src_pop_model.ln_prob(self.pop_inj_info) + \
+            self.mass_src_pop_model.ln_prob(self.pop_inj_info[["mass_1_source", "mass_2_source"]], axis=0) + \
+            self.spin_src_pop_model.ln_prob(self.pop_inj_info[["spin_1z", "spin_2z"]], axis=0) + \
             self.merger_rate_density_src_pop_model.ln_dN_over_dz(self.pop_inj_info),
             np.NINF
         )

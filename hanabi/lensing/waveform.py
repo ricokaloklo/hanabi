@@ -26,7 +26,7 @@ def strongly_lensed_BBH_waveform(
     )
 
     # Apply a phase shift per polarization
-    wf["plus"] = np.exp(1j*phase_shift_dict[image_type])*np.ones_like(wf["plus"]) * wf["plus"]
-    wf["cross"] = np.exp(1j*phase_shift_dict[image_type])*np.ones_like(wf["cross"]) * wf["cross"]
+    wf["plus"] = np.exp(-1j*phase_shift_dict[image_type])*np.ones_like(wf["plus"]) * wf["plus"]
+    wf["cross"] = np.exp(-1j*phase_shift_dict[image_type])*np.ones_like(wf["cross"]) * wf["cross"]
 
     return wf

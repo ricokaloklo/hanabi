@@ -5,6 +5,7 @@ import bilby.gw.conversion
 import bilby.gw.likelihood
 from .waveform import *
 from .conversion import convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
+from .utils import ParameterSuffix
 
 class JointLikelihood(bilby.core.likelihood.Likelihood):
     def __init__(self, single_trigger_likelihoods, sep_char="^", suffix=None):
@@ -15,7 +16,7 @@ class JointLikelihood(bilby.core.likelihood.Likelihood):
 
         self.sep_char = sep_char
         if suffix is None:
-            self.suffix = lambda trigger_idx: "{}({})".format(self.sep_char, trigger_idx + 1)
+            self.suffix = ParameterSuffix(self.sep_char)
         else:
             self.suffix = suffix
 
