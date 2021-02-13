@@ -1,5 +1,6 @@
 import bilby_pipe
 from ..inference.parser import _create_base_parser
+from bilby_pipe.utils import nonefloat, noneint, nonestr
 
 def create_hierarchical_analysis_parser(prog, prog_version):
     base_parser = _create_base_parser(prog, prog_version)
@@ -11,6 +12,8 @@ def create_hierarchical_analysis_parser(prog, prog_version):
         add_help=False,
         parents=[base_parser]       
     )
+
+    parser.add("ini", type=str, is_config_file=True, help="Configuration ini file")
 
     input_parser = parser.add_argument_group(title="Data input", description="")
     input_parser.add_argument(
