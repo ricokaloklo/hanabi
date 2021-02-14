@@ -34,14 +34,15 @@ class LuminosityDistancePriorFromRedshift(Prior):
 class ReweightWithPopulationModel(object):
     def __init__(self, result, mass_src_pop_model, spin_src_pop_model, z_src_prob_dist):
         self.result = result
-        self.mass_src_pop_model = mass_src_pop_model
-        self.spin_src_pop_model = spin_src_pop_model
-        self.z_src_prob_dist = z_src_prob_dist
-        self.ln_weights = self.compute_ln_weights()
 
         # Check if redshift is calculated and stored in result.posterior
         if not "redshift" in self.result.posterior.columns:
             self.result.posterior = bilby.gw.conversion.generate_source_frame_parameters(self.result.posterior)
+
+        self.mass_src_pop_model = mass_src_pop_model
+        self.spin_src_pop_model = spin_src_pop_model
+        self.z_src_prob_dist = z_src_prob_dist
+        self.ln_weights = self.compute_ln_weights()
 
     def compute_ln_weights_for_component_masses(self, z_src):
         det_frame_priors = DetectorFrameComponentMassesFromSourceFrame(
