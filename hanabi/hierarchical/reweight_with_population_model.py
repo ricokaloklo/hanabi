@@ -39,6 +39,10 @@ class ReweightWithPopulationModel(object):
         self.z_src_prob_dist = z_src_prob_dist
         self.ln_weights = self.compute_ln_weights()
 
+        # Check if redshift is calculated and stored in result.posterior
+        if not "redshift" in self.result.posterior.columns:
+            self.result.posterior = bilby.gw.conversion.generate_source_frame_parameters(self.result.posterior)
+
     def compute_ln_weights_for_component_masses(self, z_src):
         det_frame_priors = DetectorFrameComponentMassesFromSourceFrame(
             self.mass_src_pop_model,
