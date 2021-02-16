@@ -40,7 +40,7 @@ class DetectorFrameComponentMassesFromSourceFrame(object):
         return np.log(self.prob(dataset, axis=axis))
 
 class MonteCarloMarginalizedLikelihood(Likelihood):
-    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, lensing_selection_function=None, sep_char="^", suffix=None):
+    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, sep_char="^", suffix=None):
         # The likelihood is a function of the source redshift only
         # Might as well do this marginalization deterministically
         self.parameters = {'redshift': 0.0}
@@ -51,7 +51,6 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         self.spin_src_pop_model = spin_src_pop_model
         # This should be a list of abs_magnification_prob_dist
         self.abs_magnification_prob_dists = abs_magnification_prob_dists
-        self.lensing_selection_function = lensing_selection_function
 
         self.sep_char = sep_char
         if suffix is None:
@@ -100,8 +99,5 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         ln_weights = self.compute_ln_weights_for_component_masses(z_src) + \
             self.compute_ln_weights_for_luminosity_distances(z_src)
         ln_Z = self.result.log_evidence + logsumexp(ln_weights) - np.log(len(self.result.posterior))
-
-        if self.lensing_selection_function is not None:
-            ln_Z -= self.lensing_selection_function(z_src)
 
         return ln_Z
