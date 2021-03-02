@@ -1,10 +1,11 @@
+#!/usr/bin/env python
 import numpy as np
 import pandas as pd
 import h5py
 import copy
 import scipy.interpolate
 import tqdm
-import pdetclassifier
+from hanabi.hierarchical.pdetclassifier import pdetclassifier
 import bilby
 import hanabi.hierarchical
 import hanabi.lensing
