@@ -126,33 +126,3 @@ class UniformAlignedSpinComponent(SourcePopulationModel):
     def prob(self, dataset, axis=None):
         # z component from [-1, 1]
         return 0.25
-
-class UniformMagnitudeIsotropicSpin(SourcePopulationModel):
-    def __init__(self, a_max=1.0):
-        super(UniformMagnitudeIsotropicSpin, self).__init__(
-            signal_parameter_names=[
-                'a_1',
-                'a_2',
-                'tilt_1',
-                'tilt_2',
-                'phi_12',
-                'phi_jl'
-            ],
-            population_parameter_dict={
-                "a_max": a_max,
-            }
-        )
-
-    def _prob(self, dataset, axis=None):
-        prior_dict = {
-            'a_1': bilby.core.prior.Uniform(name='a_1', minimum=0, maximum=self.population_parameter_dict["a_max"]),
-            'a_2': bilby.core.prior.Uniform(name='a_2', minimum=0, maximum=self.population_parameter_dict["a_max"]),
-            'tilt_1': bilby.core.prior.Sine(name='tilt_1'),
-            'tilt_2': bilby.core.prior.Sine(name='tilt_2'),
-            'phi_12': bilby.core.prior.Uniform(name='phi_12', minimum=0, maximum=2 * np.pi, boundary='periodic'),
-            'phi_jl': bilby.core.prior.Uniform(name='phi_jl', minimum=0, maximum=2 * np.pi, boundary='periodic'),
-        }
-
-        probs = np.array([prior_dict[p].prob(dataset[p]) for p in self.signal_parameter_names])
-    
-        return np.prod(probs, axis=0)
