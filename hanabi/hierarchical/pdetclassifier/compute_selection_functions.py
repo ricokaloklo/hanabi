@@ -39,7 +39,6 @@ def create_parser(prog):
 	)
 	parser.add(
 		"--seed",
-		default=12345,
 		help="The random seed to use"
 	)
 
@@ -49,10 +48,11 @@ args, unknown_args = parse_args(sys.argv[1:], create_parser(__prog__))
 
 label = args.label
 trained_model = args.trained_model
-seed = args.seed
 
-logger.info(f"Setting random seed as {seed}")
-np.random.seed(seed)
+if args.seed is not None:
+	seed = args.seed
+	logger.info(f"Setting random seed as {seed}")
+	np.random.seed(seed)
 
 N = int(1e7)
 N_z = 100

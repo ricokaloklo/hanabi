@@ -1,0 +1,13 @@
+Universe   = vanilla
+Executable = compute_selection_functions.py
+Arguments  = --trained-model /home/ka-lok.lo/projects/stronglensing/hanabi/hanabi/hierarchical/pdetclassifier/trained_2e7_O3_precessing_higherordermodes_3detectors.h5 --label o3a_first3months_bbhpop_powerlaw_mmax_60_isotropic_spin_$(Process)
+Log        = compute_selection_functions.$(Process).log
+Output     = compute_selection_functions.$(Process).out
+Error      = compute_selection_functions.$(Process).err
+
+accounting_group = ligo.prod.o3.cbc.lensing.multi
+request_cpus = 2
+request_memory = 8G
+getenv = True
+
+Queue 20
