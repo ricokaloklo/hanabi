@@ -1,6 +1,7 @@
 #!/usr/bin/env python
 import numpy as np
 import pandas as pd
+import sys
 import h5py
 import copy
 import scipy.interpolate
@@ -11,18 +12,47 @@ import hanabi.hierarchical
 import hanabi.lensing
 import logging
 from hanabi.inference.utils import setup_logger
+from bilby_pipe.bilbyargparser import BilbyArgParser
+from bilby_pipe.utils import parse_args
+import configargparse
 
 __prog__ = "compute_selection_functions"
 setup_logger(__prog__)
 logger = logging.getLogger(__prog__)
 
-label = "o3a_first3months_bbhpop_powerlaw_mmax_60_isotropic_spin"
-trained_model = "trained_2e7_O3_precessing_higherordermodes_3detectors.h5"
+def create_parser(prog):
+	parser = BilbyArgParser(
+		prog=prog,
+		usage=None,
+		ignore_unknown_config_file_keys=False,
+		formatter_class=configargparse.ArgumentDefaultsHelpFormatter
+	)
+	parser.add(
+		"--label",
+		required=True,
+		help="Label for the output H5 file"
+	)
+	parser.add(
+		"--trained-model",
+		required=True,
+		help="The pdetclassifier model for the calculation"
+	)
+	parser.add(
+		"--seed",
+		default=12345,
+		help="The random seed to use"
+	)
 
-seed = 12345
-if seed is not None:
-	logger.info(f"Setting random seed as {seed}")
-	np.random.seed(seed)
+	return parser
+
+args, unknown_args = parse_args(sys.argv[1:], create_parser(__prog__))
+
+label = args.label
+trained_model = args.trained_model
+seed = args.seed
+
+logger.info(f"Setting random seed as {seed}")
+np.random.seed(seed)
 
 N = int(1e7)
 N_z = 100
