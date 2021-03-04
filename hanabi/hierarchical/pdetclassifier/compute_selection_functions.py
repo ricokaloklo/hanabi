@@ -169,9 +169,9 @@ logger.info(f"Writing output to {output_filename}")
 output_binaries = {"mass_1_source": m1_src, "mass_2_source": m2_src, "spin_1x": binaries["chi1x"], "spin_1y": binaries["chi1y"], "spin_1z": binaries["chi1z"], "spin_2x": binaries["chi2x"], "spin_2y": binaries["chi2y"], "spin_2z": binaries["chi2z"], "sampling_pdf": pdf_mass, "weight": weights}
 output_binaries_keys = list(output_binaries.keys())
 output_binaries_dt = np.dtype({"names": output_binaries_keys, "formats": [float]*len(output_binaries_keys)})
-output_binaries = np.rec.array(list(output_binaries.values()), dtype=output_binaries_dt)
+output_binaries = np.rec.fromarrays(list(output_binaries.values()), dtype=output_binaries_dt)
 output_inner_integral_dt = np.dtype({"names": ["z", "epsilon", "sampling_pdf"], "formats": [float]*3})
-output_inner_integral = np.rec.array([zs_lensed, inner_integral, pdf_z_lensed], dtype=output_inner_integral_dt)
+output_inner_integral = np.rec.fromarrays([zs_lensed, inner_integral, pdf_z_lensed], dtype=output_inner_integral_dt)
 f.create_dataset("binaries", data=output_binaries)
 f.create_dataset("epsilon", data=output_inner_integral)
 f.attrs["N"] = N
