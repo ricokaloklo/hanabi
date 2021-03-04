@@ -1,25 +1,56 @@
+#!/usr/bin/env python
 import numpy as np
 import pandas as pd
+import sys
 import h5py
 import copy
 import scipy.interpolate
 import tqdm
-import pdetclassifier
+from hanabi.hierarchical.pdetclassifier import pdetclassifier
 import bilby
 import hanabi.hierarchical
 import hanabi.lensing
 import logging
 from hanabi.inference.utils import setup_logger
+from bilby_pipe.bilbyargparser import BilbyArgParser
+from bilby_pipe.utils import parse_args
+import configargparse
 
 __prog__ = "compute_selection_functions"
 setup_logger(__prog__)
 logger = logging.getLogger(__prog__)
 
-label = "o3a_first3months_bbhpop_powerlaw"
-trained_model = "trained_2e7_O3_precessing_higherordermodes_3detectors.h5"
+def create_parser(prog):
+	parser = BilbyArgParser(
+		prog=prog,
+		usage=None,
+		ignore_unknown_config_file_keys=False,
+		formatter_class=configargparse.ArgumentDefaultsHelpFormatter
+	)
+	parser.add(
+		"--label",
+		required=True,
+		help="Label for the output H5 file"
+	)
+	parser.add(
+		"--trained-model",
+		required=True,
+		help="The pdetclassifier model for the calculation"
+	)
+	parser.add(
+		"--seed",
+		help="The random seed to use"
+	)
 
-seed = 12345
-if seed is not None:
+	return parser
+
+args, unknown_args = parse_args(sys.argv[1:], create_parser(__prog__))
+
+label = args.label
+trained_model = args.trained_model
+
+if args.seed is not None:
+	seed = args.seed
 	logger.info(f"Setting random seed as {seed}")
 	np.random.seed(seed)
 
@@ -38,7 +69,7 @@ class Fixed(object):
 
 # Setting up the population and lensing model
 mass_src_pop_model = hanabi.hierarchical.source_population_model.PowerLawComponentMass(alpha=1.8, beta=0, mmin=5, mmax=60)
-spin_src_pop_model = hanabi.hierarchical.source_population_model.UniformAlignedSpinComponent()
+spin_src_pop_model = None # Currently we use the default uniform-magnitude-isotropic-spin distribution in pdetclassifier
 abs_magn_dist = hanabi.lensing.absolute_magnification.SISPowerLawAbsoluteMagnification()
 merger_rate_density = hanabi.hierarchical.merger_rate_density.BelczynskiEtAl2017PopIPopIIStarsBBHMergerRateDensity()
 optical_depth = hanabi.lensing.optical_depth.HannukselaEtAl2019OpticalDepth()
@@ -47,14 +78,8 @@ pz_notlensed = hanabi.hierarchical.p_z.NotLensedSourceRedshiftProbDist(merger_ra
 
 # Fiducial intrinsic population model. We generate samples from these distribution instead
 fiducial_intrinsic_pop_models = {
-	"m1_src": bilby.core.prior.Uniform(minimum=5, maximum=60),
-	"m2_src": bilby.core.prior.Uniform(minimum=5, maximum=60),
-	"chi1x": Fixed(0.0),
-	"chi1y": Fixed(0.0),
-	"chi1z": bilby.core.prior.Uniform(minimum=-1,maximum=1),
-	"chi2x": Fixed(0.0),
-	"chi2y": Fixed(0.0),
-	"chi2z": bilby.core.prior.Uniform(minimum=-1,maximum=1),
+	"m1_src": bilby.core.prior.Uniform(minimum=5, maximum=100),
+	"m2_src": bilby.core.prior.Uniform(minimum=5, maximum=100),
 }
 
 def generate_intrinsic_parameters(N):
@@ -68,36 +93,14 @@ def generate_intrinsic_parameters(N):
 			m2_src[idx] = tmp
 	q = m2_src/m1_src
 	pdf_mass = np.ones_like(m1_src)*(fiducial_intrinsic_pop_models["m1_src"].prob(m1_src))*(fiducial_intrinsic_pop_models["m2_src"].prob(m2_src))
-
-	# Spins
-	chi1x = fiducial_intrinsic_pop_models["chi1x"].sample(size=N)
-	chi1y = fiducial_intrinsic_pop_models["chi1y"].sample(size=N)
-	chi1z = fiducial_intrinsic_pop_models["chi1z"].sample(size=N)
-	chi2x = fiducial_intrinsic_pop_models["chi2x"].sample(size=N)
-	chi2y = fiducial_intrinsic_pop_models["chi2y"].sample(size=N)
-	chi2z = fiducial_intrinsic_pop_models["chi2z"].sample(size=N)
-	pdf_spin = np.ones_like(chi1z)* \
-		(fiducial_intrinsic_pop_models["chi1x"].prob(chi1x))* \
-		(fiducial_intrinsic_pop_models["chi1y"].prob(chi1y))* \
-		(fiducial_intrinsic_pop_models["chi1z"].prob(chi1z))* \
-		(fiducial_intrinsic_pop_models["chi2x"].prob(chi2x))* \
-		(fiducial_intrinsic_pop_models["chi2y"].prob(chi2y))* \
-		(fiducial_intrinsic_pop_models["chi2z"].prob(chi2z))
 	
-	return m1_src, m2_src, q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, pdf_mass, pdf_spin
+	return m1_src, m2_src, q, pdf_mass
 
 # Setting up a fiducial population
 binaries = pdetclassifier.generate_binaries(N)
-m1_src, m2_src, q, chi1x, chi1y, chi1z, chi2x, chi2y, chi2z, pdf_mass, pdf_spin = generate_intrinsic_parameters(N)
-binaries['chi1x'] = chi1x
-binaries['chi1y'] = chi1y
-binaries['chi1z'] = chi1z
-binaries['chi2x'] = chi2x
-binaries['chi2y'] = chi2y
-binaries['chi2z'] = chi2z
+m1_src, m2_src, q, pdf_mass = generate_intrinsic_parameters(N)
 weights_mass = mass_src_pop_model.prob(pd.DataFrame({"mass_1_source": m1_src, "mass_2_source": m2_src}), axis=0)/pdf_mass
-weights_spin = spin_src_pop_model.prob(pd.DataFrame({"spin_1x": chi1x, "spin_1y": chi1y, "spin_1z": chi1z, "spin_2x": chi2x, "spin_2y": chi2y, "spin_2z": chi2z}), axis=0)/pdf_spin
-weights = weights_mass * weights_spin
+weights = weights_mass
 
 # Redshift
 zs_notlensed = pz_notlensed.sample(size=N)
@@ -124,14 +127,6 @@ spline_int = scipy.interpolate.splrep(dL_int, zs_int, s=0)
 # Setting up a fiducial population model
 binaries = {} # New dictionary
 binaries = pdetclassifier.generate_binaries(N)
-
-# Using the spins that we have already drawn from the fiducial distributions
-binaries['chi1x'] = chi1x
-binaries['chi1y'] = chi1y
-binaries['chi1z'] = chi1z
-binaries['chi2x'] = chi2x
-binaries['chi2y'] = chi2y
-binaries['chi2z'] = chi2z
 
 zs_lensed = pz_lensed.sample(size=N_z)
 pdf_z_lensed = pz_lensed.prob(zs_lensed)
@@ -171,12 +166,12 @@ output_filename = "{}.h5".format(label)
 f = h5py.File(output_filename, "w")
 # Writing the results to a HDF5 file
 logger.info(f"Writing output to {output_filename}")
-output_binaries = {"mass_1_source": m1_src, "mass_2_source": m2_src, "spin_1x": chi1x, "spin_1y": chi1y, "spin_1z": chi1z, "spin_2x": chi2x, "spin_2y": chi2y, "spin_2z": chi2z, "sampling_pdf": pdf_mass+pdf_spin, "weight": weights}
+output_binaries = {"mass_1_source": m1_src, "mass_2_source": m2_src, "spin_1x": binaries["chi1x"], "spin_1y": binaries["chi1y"], "spin_1z": binaries["chi1z"], "spin_2x": binaries["chi2x"], "spin_2y": binaries["chi2y"], "spin_2z": binaries["chi2z"], "sampling_pdf": pdf_mass, "weight": weights}
 output_binaries_keys = list(output_binaries.keys())
 output_binaries_dt = np.dtype({"names": output_binaries_keys, "formats": [float]*len(output_binaries_keys)})
-output_binaries = np.rec.array(list(output_binaries.values()), dtype=output_binaries_dt)
+output_binaries = np.rec.fromarrays(list(output_binaries.values()), dtype=output_binaries_dt)
 output_inner_integral_dt = np.dtype({"names": ["z", "epsilon", "sampling_pdf"], "formats": [float]*3})
-output_inner_integral = np.rec.array([zs_lensed, inner_integral, pdf_z_lensed], dtype=output_inner_integral_dt)
+output_inner_integral = np.rec.fromarrays([zs_lensed, inner_integral, pdf_z_lensed], dtype=output_inner_integral_dt)
 f.create_dataset("binaries", data=output_binaries)
 f.create_dataset("epsilon", data=output_inner_integral)
 f.attrs["N"] = N
