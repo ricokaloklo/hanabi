@@ -42,7 +42,43 @@ class Marginalized(SourcePopulationModel):
 
     def prob(self, dataset, axis=None):
         return 1.0
- 
+
+# Wrapper for gwpopulation's SinglePeakSmoothedMassDistribution
+class PowerLawPlusPeak(SourcePopulationModel):
+    def __init__(self, alpha, beta, mmin, mmax, lam, mpp, sigpp, delta_m):
+        super(PowerLawPlusPeak, self).__init__(
+            signal_parameter_names = [
+                "mass_1_source",
+                "mass_ratio",
+            ],
+            population_parameter_dict = {
+                'alpha': alpha,
+                'beta': beta,
+                'mmin': mmin,
+                'mmax': mmax,
+                'lam': lam,
+                'mpp': mpp,
+                'sigpp': sigpp,
+                'delta_m': delta_m,
+            }
+        )
+        self.gwpop_model = gwpopulation.models.mass.SinglePeakSmoothedMassDistribution()
+        
+    def _parameter_conversion(self, dataset):
+        if self._check_if_keys_exist(names=["mass_1_source", "mass_2_source"], keys=dataset.keys()):
+            # Convert mass_1, mass_2 to mass_1, mass_ratio
+            mass_ratio = bilby.gw.conversion.component_masses_to_mass_ratio(
+                mass_1=dataset["mass_1_source"],
+                mass_2=dataset["mass_2_source"]
+            )
+            dataset["mass_ratio"] = mass_ratio
+
+    def _prob(self, dataset, axis=None):
+        p_m1 = self.gwpop_model.p_m1({"mass_1": dataset["mass_1_source"], "mass_ratio": dataset["mass_ratio"]}, **{k:v for k,v in self.population_parameter_dict.items() if k not in ["beta"]})
+        p_q = self.gwpop_model.p_q({"mass_1": dataset["mass_1_source"], "mass_ratio": dataset["mass_ratio"]}, **{k:v for k,v in self.population_parameter_dict.items() if k in ["beta", "mmin", "delta_m"]})
+        # Note here we define q \equiv m2/m1 where m1 > m2 so 0 < q <= 1
+        # Jacobian J = |dq/dm2| = 1/m1
+        return p_m1*p_q*1./dataset["mass_1_source"]
 
 # Wrapper for gwpopulation's power_law_primary_mass_ratio
 class PowerLawPrimaryMassRatio(SourcePopulationModel):
