@@ -1,4 +1,5 @@
 import sys
+import numpy as np
 from bilby.core.result import Result
 from bilby.core.result import reweight
 from bilby.gw.prior import convert_to_flat_in_component_mass_prior, UniformComovingVolume
@@ -9,6 +10,7 @@ from bilby_pipe.utils import parse_args
 import configargparse
 import logging
 from .utils import setup_logger
+from scipy.special import logsumexp
 
 __prog__ = "hanabi_postprocess_result"
 
@@ -43,6 +45,13 @@ def reweight_flat_in_component_masses(result):
         result.posterior = converted_posterior
         logger.info("Adding {} samples".format(", ".join(added_keys)))
     result_reweighted = convert_to_flat_in_component_mass_prior(result)
+    # NOTE Here we reweight the **evidence** as well
+    weights = np.array(result.get_weights_by_new_prior(result.priors, result_reweighted.priors,
+                                                       prior_names=['chirp_mass', 'mass_ratio', 'mass_1', 'mass_2']))
+    jacobian = result.posterior["mass_1"] ** 2 / result.posterior["chirp_mass"]
+    ln_weights = np.log(jacobian * weights)
+    result_reweighted.log_evidence = result.log_evidence + logsumexp(ln_weights) - np.log(len(result.posterior))
+    result_reweighted.log_bayes_factor = result.log_bayes_factor + logsumexp(ln_weights) - np.log(len(result.posterior))
     return result_reweighted
 
 def reweight_uniform_in_comoving_volume(result):
