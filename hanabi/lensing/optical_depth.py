@@ -41,3 +41,7 @@ class HarisEtAl2018OpticalDepth(TurnerEtAl1984OpticalDepth):
             4.17e-6,
             cosmo=cosmo
         )
+
+class Oguri2019StrongLensingProb(OpticalDepth):
+    def evaluate(self, z):
+        return (5e-4 * z**3)/((1 + (0.41 * z**1.1))**2.7)
