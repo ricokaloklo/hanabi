@@ -1,6 +1,7 @@
 import numpy as np
 import copy
 import bilby.core.likelihood
+from ..lensing.utils import ParameterSuffix
 
 class JointLikelihood(bilby.core.likelihood.Likelihood):
     def __init__(self, single_trigger_likelihoods, sep_char="^", suffix=None):
@@ -10,7 +11,10 @@ class JointLikelihood(bilby.core.likelihood.Likelihood):
         self.n_triggers = len(self.single_trigger_likelihoods) # Reconstruct the number of triggers
 
         self.sep_char = sep_char
-        self.suffix = suffix
+        if suffix is None:
+            self.suffix = ParameterSuffix(self.sep_char)
+        else:
+            self.suffix = suffix
 
     def assign_trigger_level_parameters(self, full_parameters=None):
         if full_parameters is None:
