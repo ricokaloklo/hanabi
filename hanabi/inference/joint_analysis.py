@@ -22,6 +22,7 @@ from hanabi.lensing.waveform import *
 # Lensing likelihood
 import hanabi.lensing.likelihood
 from .utils import setup_logger
+from .utils import ParameterSuffix
 from .parser import create_joint_analysis_parser
 
 from .._version import __version__
@@ -64,7 +65,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
 
         # FIXME Make sure no one will use the ^ sign to name actual parameter
         self.sep_char = "^"
-        self.suffix = lambda trigger_idx: "{}({})".format(self.sep_char, trigger_idx + 1)
+        self.suffix = ParameterSuffix(self.sep_char)
 
         if self.retry_for_data_generation > 0:
             while True:
