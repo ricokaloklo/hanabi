@@ -1,7 +1,7 @@
 import numpy as np
 import copy
 import bilby.core.likelihood
-from ..lensing.utils import ParameterSuffix
+from .utils import ParameterSuffix
 
 class JointLikelihood(bilby.core.likelihood.Likelihood):
     def __init__(self, single_trigger_likelihoods, sep_char="^", suffix=None):

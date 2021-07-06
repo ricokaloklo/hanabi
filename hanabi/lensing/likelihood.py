@@ -4,9 +4,9 @@ import bilby.core.likelihood
 import bilby.gw.conversion
 import bilby.gw.likelihood
 from ..inference.likelihood import JointLikelihood
+from ..inference.utils import ParameterSuffix
 from .waveform import *
 from .conversion import convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
-from .utils import ParameterSuffix
 
 class LensingJointLikelihood(JointLikelihood):
     def __init__(self, single_trigger_likelihoods, lensed_waveform_model, sep_char="^", suffix=None):

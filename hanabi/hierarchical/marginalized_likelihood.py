@@ -1,7 +1,7 @@
 import numpy as np
 import bilby
 from .utils import get_ln_weights_for_reweighting
-from ..lensing.utils import ParameterSuffix
+from ..inference.utils import ParameterSuffix
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Prior, PriorDict
 from scipy.special import logsumexp
