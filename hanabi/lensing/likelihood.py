@@ -59,3 +59,59 @@ class LensingJointLikelihood(JointLikelihood):
                 raise NotImplementedError("Currently do not support sampling in comoving distance")
 
         return parameters_per_trigger
+
+
+class LensingJointLikelihoodWithWaveformCache(LensingJointLikelihood):
+    def initialize_cache(self):
+        self._cache = dict(parameters=None, waveform=None, model=None)
+    
+    def add_to_cache(self, likelihood, parameters):
+        self._cache = copy.deepcopy(likelihood.waveform_generator._cache)
+        self._cache["sampled_parameters"] = parameters
+
+    def transform_from_cache(self, likelihood, parameters):
+        # Check if the cached waveform can be transformed to the desired waveform
+        # The following parameters can be (and should be) different
+        # FIXME This will break if sampled in detector-frame time
+        parameters_excluded_from_comparison = ["image_type", "luminosity_distance", "geocent_time"]
+        parameters_to_be_checked = [k for k in parameters.keys() if k not in parameters_excluded_from_comparison]
+        if {k:v for k,v in parameters.items() if k in parameters_to_be_checked} == {k:v for k,v in self._cache["sampled_parameters"].items() if k in parameters_to_be_checked}:
+            scale = self._cache["sampled_parameters"]["luminosity_distance"]/parameters["luminosity_distance"]
+            phase = morse_phase_from_image_type(int(parameters["image_type"])) - morse_phase_from_image_type(int(self._cache["sampled_parameters"]["image_type"]))
+
+            # Perform the transformation
+            self._cache["waveform"]["plus"] = np.exp(-1j*phase)*np.ones_like(self._cache["waveform"]["plus"])*scale*self._cache["waveform"]["plus"]
+            self._cache["waveform"]["cross"] = np.exp(-1j*phase)*np.ones_like(self._cache["waveform"]["cross"])*scale*self._cache["waveform"]["cross"]
+
+            self._cache["parameters"]["image_type"] = parameters["image_type"]
+            self._cache["parameters"]["luminosity_distance"] = parameters["luminosity_distance"]
+
+            # Assign this cache to the waveform generator
+            likelihood.waveform_generator._cache = self._cache
+            # FIXME This is to make sure that it is using the cache
+            likelihood.waveform_generator.frequency_domain_source_model = self._cache["model"]
+
+
+    def log_likelihood(self):
+        # Sum over all the log_likelihood values with the appropriate parameters passed
+        parameters_per_trigger = self.assign_trigger_level_parameters(full_parameters=self.parameters)
+        logL = 0.0
+
+        # Initialize cache per joint likelihood evaluation
+        self.initialize_cache()
+
+        for single_trigger_likelihood, single_trigger_parameters in zip(self.single_trigger_likelihoods, parameters_per_trigger):
+            if self._cache["waveform"] is not None:
+                self.transform_from_cache(single_trigger_likelihood, single_trigger_parameters)
+
+            # Assign the single_trigger_parameters to the likelihood object for evaluation
+            single_trigger_likelihood.parameters.update(single_trigger_parameters)
+
+            # Calculate the log likelihood
+            logL += single_trigger_likelihood.log_likelihood()
+
+            # Update cache if empty
+            if self._cache["waveform"] is None:
+                self.add_to_cache(single_trigger_likelihood, single_trigger_parameters)
+
+        return logL

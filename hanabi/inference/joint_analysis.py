@@ -224,7 +224,10 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         priors = self.construct_full_prior_dict()
 
         # Construct the LensingJointLikelihood object
-        likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, self.lensed_waveform_model, sep_char=self.sep_char, suffix=self.suffix)
+        if self.waveform_cache:
+            likelihood = hanabi.lensing.likelihood.LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, self.lensed_waveform_model, sep_char=self.sep_char, suffix=self.suffix)
+        else:
+            likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, self.lensed_waveform_model, sep_char=self.sep_char, suffix=self.suffix)
 
         return likelihood, priors
 
