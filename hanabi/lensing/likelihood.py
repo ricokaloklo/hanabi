@@ -88,8 +88,6 @@ class LensingJointLikelihoodWithWaveformCache(LensingJointLikelihood):
 
             # Assign this cache to the waveform generator
             likelihood.waveform_generator._cache = self._cache
-            # FIXME This is to make sure that it is using the cache
-            likelihood.waveform_generator.frequency_domain_source_model = self._cache["model"]
 
 
     def log_likelihood(self):
