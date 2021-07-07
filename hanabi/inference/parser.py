@@ -221,6 +221,13 @@ def _add_hanabi_settings_to_parser(parser):
         ),
     )
 
+    lensed_waveform_parser.add(
+        "--waveform-cache",
+        default=False,
+        action=StoreBoolean,
+        help="Enable waveform caching",
+    )
+
     return parser
 
 def create_joint_main_parser(prog, prog_version):
