@@ -39,6 +39,7 @@ def create_parser(prog):
 	)
 	parser.add(
 		"--seed",
+		type=int,
 		help="The random seed to use"
 	)
 
