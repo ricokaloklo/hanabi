@@ -82,32 +82,6 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         self.initialize_single_trigger_data_analysis_inputs()
 
     @property
-    def lensed_waveform_model(self):
-        return self._lensed_waveform_model
-
-    @lensed_waveform_model.setter
-    def lensed_waveform_model(self, lensed_waveform_model):
-        # A list of built-in lensed_waveform_model string
-        built_in_lensed_waveform_model_dict = {
-            "strongly_lensed_BBH_waveform": strongly_lensed_BBH_waveform
-        }
-
-        logger = logging.getLogger(__prog__)
-        logger.info(f"Using the lensed waveform model {lensed_waveform_model}")
-
-        if lensed_waveform_model in built_in_lensed_waveform_model_dict.keys():
-            self._lensed_waveform_model = built_in_lensed_waveform_model_dict[lensed_waveform_model]
-        elif "." in lensed_waveform_model:
-            split_model = lensed_waveform_model.split(".")
-            module = ".".join(split_model[:-1])
-            func = split_model[-1]
-            self._lensed_waveform_model = getattr(import_module(module), func)
-        else:
-            raise FileNotFoundError(
-                f"No lensed waveform model {lensed_waveform_model} found."
-            )
-
-    @property
     def common_parameters(self):
         return self._common_parameters
 
@@ -225,9 +199,9 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
 
         # Construct the LensingJointLikelihood object
         if self.waveform_cache:
-            likelihood = hanabi.lensing.likelihood.LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, self.lensed_waveform_model, sep_char=self.sep_char, suffix=self.suffix)
+            likelihood = hanabi.lensing.likelihood.LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
         else:
-            likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, self.lensed_waveform_model, sep_char=self.sep_char, suffix=self.suffix)
+            likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
 
         return likelihood, priors
 

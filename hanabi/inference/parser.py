@@ -211,17 +211,6 @@ def _add_hanabi_settings_to_parser(parser):
     )
 
     lensed_waveform_parser.add(
-        "--lensed-waveform-model",
-        default="strongly_lensed_BBH_waveform",
-        type=str,
-        help=(
-            "Name of the lensed waveform model. Can be one of"
-            "[strongly_lensed_BBH_waveform] or any python  path to a bilby "
-            " source function the users installation, e.g. examp.source.bbh"
-        ),
-    )
-
-    lensed_waveform_parser.add(
         "--waveform-cache",
         default=False,
         action=StoreBoolean,

@@ -9,16 +9,13 @@ from .waveform import *
 from .conversion import convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
 
 class LensingJointLikelihood(JointLikelihood):
-    def __init__(self, single_trigger_likelihoods, lensed_waveform_model, sep_char="^", suffix=None):
+    def __init__(self, single_trigger_likelihoods, sep_char="^", suffix=None):
         if suffix is None:
             suffix = ParameterSuffix(sep_char)
         super(LensingJointLikelihood, self).__init__(single_trigger_likelihoods, sep_char=sep_char, suffix=suffix)
-        self.lensed_waveform_model = lensed_waveform_model
 
-        # Assign the lensed waveform model specified to the single-trigger likelihoods
         # FIXME For now we assign convert_to_lal_binary_black_hole_parameters_for_lensed_BBH as the default parameter_conversion function
         for single_trigger_likelihood in self.single_trigger_likelihoods:
-            single_trigger_likelihood.waveform_generator.frequency_domain_source_model = self.lensed_waveform_model
             single_trigger_likelihood.waveform_generator.parameter_conversion = convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
 
     def assign_trigger_level_parameters(self, full_parameters=None):
