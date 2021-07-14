@@ -116,11 +116,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         return os.path.relpath(result_dir)
 
     @staticmethod
-    def _check_consistency_between_data_analysis_inputs(single_trigger_pe_inputs):
-        arguments_to_check = [
-            "reference_frequency",
-        ]
-
+    def _check_consistency_between_data_analysis_inputs(single_trigger_pe_inputs, arguments_to_check):
         for arg in arguments_to_check:
             # Compare the value set with that set in the first input
             value_set_in_first_input = getattr(single_trigger_pe_inputs[0], arg, None)
@@ -144,7 +140,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             self.single_trigger_likelihoods.append(likelihood)
             self.single_trigger_priors.append(priors)
 
-        self._check_consistency_between_data_analysis_inputs(self.single_trigger_data_analysis_inputs)
+        self._check_consistency_between_data_analysis_inputs(self.single_trigger_data_analysis_inputs, ["reference_frequency"])
 
     def parse_lensing_prior_dict(self):
         # Pre-process/convert the prior dict string
@@ -199,6 +195,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
 
         # Construct the LensingJointLikelihood object
         if self.waveform_cache:
+            self._check_consistency_between_data_analysis_inputs(self.single_trigger_data_analysis_inputs, ["duration", "minimum_frequency", "maximum_frequency"])
             likelihood = hanabi.lensing.likelihood.LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
         else:
             likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
