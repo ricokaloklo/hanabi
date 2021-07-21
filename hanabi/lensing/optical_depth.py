@@ -45,3 +45,7 @@ class HarisEtAl2018OpticalDepth(TurnerEtAl1984OpticalDepth):
 class Oguri2019StrongLensingProb(OpticalDepth):
     def evaluate(self, z):
         return (5e-4 * z**3)/((1 + (0.41 * z**1.1))**2.7)
+
+class NotLensedOpticalDepth(OpticalDepth):
+    def evaluate(self, z):
+        return np.zeros_like(z)
