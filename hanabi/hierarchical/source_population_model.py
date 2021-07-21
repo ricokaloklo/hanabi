@@ -1,4 +1,5 @@
 import numpy as np
+import bilby
 import bilby.gw.conversion
 import gwpopulation.models
 
@@ -162,3 +163,35 @@ class UniformAlignedSpinComponent(SourcePopulationModel):
     def prob(self, dataset, axis=None):
         # z component from [-1, 1]
         return 0.25
+
+class UniformSpinMagnitudeIsotropicOrientation(SourcePopulationModel):
+    def __init__(self):
+        super(UniformSpinMagnitudeIsotropicOrientation, self).__init__(
+            signal_parameter_names=[
+                'spin_1x',
+                'spin_1y',
+                'spin_1z',
+                'spin_2x',
+                'spin_2y',
+                'spin_2z',
+            ],
+            population_parameter_dict={},
+        )
+
+    def _parameter_conversion(self, dataset):
+        # NOTE We are here once again convert from (x,y,z) parametrization to (r,\theta,\phi) parametrization
+        for i in [1,2]:
+            # Magnitude a_i
+            dataset["a_{}".format(i)] = np.sqrt(dataset["spin_{}x".format(i)]**2 + dataset["spin_{}y".format(i)]**2 + dataset["spin_{}z".format(i)]**2)
+            # Tilt angle tilt_i
+            dataset["tilt_{}".format(i)] = np.arccos(dataset["spin_{}z".format(i)]/dataset["a_{}".format(i)])
+
+    def prob(self, dataset, axis=None):
+        self._parameter_conversion(dataset) # Do parameter conversion regardless
+        p = 1
+        for i in [1,2]:
+            p *= bilby.core.prior.Uniform(name='magn', minimum=0, maximum=1).prob(dataset["a_{}".format(i)])
+            p *= bilby.core.prior.Sine(name='tilt').prob(dataset["tilt_{}".format(i)])
+            p *= np.ones_like(dataset["a_{}".format(i)])*1./(2*np.pi) # Independent of how one defines the domain
+
+        return np.array(p)
