@@ -18,6 +18,7 @@ from bilby_pipe.utils import CHECKPOINT_EXIT_CODE
 
 # Lensed waveform source model
 from hanabi.lensing.waveform import *
+from ..lensing.conversion import convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
 
 # Lensing likelihood
 import hanabi.lensing.likelihood
@@ -190,12 +191,20 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             
         return full_prior_dict
 
+    @staticmethod
+    def conversion_function(sample):
+        out_sample, _ = convert_to_lal_binary_black_hole_parameters_for_lensed_BBH(sample)
+        return out_sample
+
     def get_likelihood_and_priors(self):
         """
         Return JointLikelihood and the full prior with lensing parameters
         """
         # Construct the full_prior_dict
-        priors = self.construct_full_prior_dict()
+        priors = bilby.core.prior.PriorDict(
+            self.construct_full_prior_dict(),
+            conversion_function=self.conversion_function,
+        )
 
         # Construct the LensingJointLikelihood object
         if self.waveform_cache:
