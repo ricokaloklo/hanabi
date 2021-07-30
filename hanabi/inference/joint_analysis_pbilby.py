@@ -297,6 +297,7 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
     def initialize_single_trigger_data_analysis_inputs(self):
         self.single_trigger_likelihoods = []
         self.single_trigger_priors = []
+        self.single_trigger_args = []
 
         # Loop over data dump files to construct the priors and likelihoods from single triggers
         for data_dump_file in self.data_dump_files:
@@ -306,6 +307,7 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
                 waveform_generator = data_dump["waveform_generator"]
                 waveform_generator.start_time = ifo_list[0].time_array[0]
                 args = data_dump["args"]
+                self.single_trigger_args.append(args)
                 priors = bilby.gw.prior.PriorDict.from_json(data_dump["prior_file"])
                 self.single_trigger_priors.append(priors)
 
@@ -316,6 +318,10 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
                     args=args,
                 )
                 self.single_trigger_likelihoods.append(likelihood)
+
+        self.single_trigger_data_analysis_inputs = self.single_trigger_args
+        self._check_consistency_between_data_analysis_inputs(self.single_trigger_data_analysis_inputs, ["reference_frequency"])
+
 
 def conversion_function(sample):
     out_sample, _ = convert_to_lal_binary_black_hole_parameters_for_lensed_BBH(sample)
@@ -336,11 +342,6 @@ analysis = JointDataAnalysisInput(input_args, [])
 outdir = input_args.outdir
 label = input_args.label
 likelihood, priors = analysis.get_likelihood_and_priors()
-# Make sure that priors is of PriorDict
-priors = bilby.core.prior.PriorDict(
-    priors,
-    conversion_function=conversion_function,
-)
 
 def prior_transform_function(u_array):
     return priors.rescale(sampling_keys, u_array)
