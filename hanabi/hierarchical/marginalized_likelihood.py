@@ -1,10 +1,11 @@
 import numpy as np
 import bilby
-from .utils import get_ln_weights_for_reweighting
+import logging
+from .utils import get_ln_weights_for_reweighting, setup_logger
 from ..inference.utils import ParameterSuffix
+from .cupy_utils import _GPU_ENABLED, PriorDict, logsumexp
 from bilby.core.likelihood import Likelihood
-from bilby.core.prior import Prior, PriorDict
-from scipy.special import logsumexp
+from bilby.core.prior import Prior
 
 class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
     def __init__(self, abs_magnification_prob_dist, z_src, name=None, latex_label=None, unit=None):
@@ -73,6 +74,23 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         sampling_priors = PriorDict(dictionary={p: self.result.priors[p] for p in parameters_to_extract})
         self.sampling_prior_pdf = sampling_priors.ln_prob(self.data, axis=0)
 
+        logger = logging.getLogger("hanabi_hierarchical_analysis")
+        if _GPU_ENABLED:
+            # NOTE gwpopulation will automatically use GPU for computation (no way to disable that)
+            self.use_gpu = True
+            logger.info("Using GPU for likelihood evaluation")
+        else:
+            # Fall back to numpy
+            self.use_gpu = False
+            logger.info("Using CPU for likelihood evaluation")
+
+        if self.use_gpu:
+            import cupy as cp
+            # Move data to GPU
+            self.sampling_prior_pdf = cp.asarray(self.sampling_prior_pdf)
+            for k in self.data.keys():
+                self.data[k] = cp.asarray(self.data[k])
+
     def compute_ln_weights_for_luminosity_distances(self, z_src):
         # Construct the prior dict for apparent luminosity distance
         new_priors = {}
@@ -105,6 +123,6 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         z_src = self.parameters["redshift"]
         ln_weights = self.compute_ln_weights_for_component_masses(z_src) + \
             self.compute_ln_weights_for_luminosity_distances(z_src)
-        ln_Z = self.result.log_evidence + logsumexp(ln_weights) - np.log(len(self.result.posterior))
+        ln_Z = self.result.log_evidence + logsumexp(ln_weights) - np.log(len(ln_weights))
 
         return ln_Z
