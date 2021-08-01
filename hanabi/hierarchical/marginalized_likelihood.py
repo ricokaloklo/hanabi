@@ -40,7 +40,7 @@ class DetectorFrameComponentMassesFromSourceFrame(object):
         return np.log(self.prob(dataset, axis=axis))
 
 class MonteCarloMarginalizedLikelihood(Likelihood):
-    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, sep_char="^", suffix=None):
+    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, sep_char="^", suffix=None, n_samples=None):
         # The likelihood is a function of the source redshift only
         # Might as well do this marginalization deterministically
         self.parameters = {'redshift': 0.0}
@@ -58,10 +58,24 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         else:
             self.suffix = suffix
 
+        # Downsample if n_samples is given
+        keep_idxs = np.arange(len(self.result.posterior))
+        if n_samples is not None:
+            keep_idxs = np.random.choice(keep_idxs, size=n_samples)
+        self.keep_idxs = keep_idxs
+
+        # Extract only the relevant parameters
+        parameters_to_extract = ["luminosity_distance" + self.suffix(trigger_idx) for trigger_idx, _ in enumerate(self.abs_magnification_prob_dists)]
+        parameters_to_extract += ["mass_1", "mass_2"]
+        self.data = {p: self.result.posterior[p].to_numpy()[keep_idxs] for p in parameters_to_extract}
+
+        # Evaluate the pdf of the sampling prior once and only once using numpy
+        sampling_priors = PriorDict(dictionary={p: self.result.priors[p] for p in parameters_to_extract})
+        self.sampling_prior_pdf = sampling_priors.ln_prob(self.data, axis=0)
+
     def compute_ln_weights_for_luminosity_distances(self, z_src):
-        # Construct the prior dicts for apparent luminosity distance
+        # Construct the prior dict for apparent luminosity distance
         new_priors = {}
-        old_priors = {}
         parameters = []
 
         for trigger_idx, abs_magn in enumerate(self.abs_magnification_prob_dists):
@@ -74,13 +88,9 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
                     name=parameter_name,
                     unit="Mpc",
                 )
-            old_priors[parameter_name] = \
-                self.result.priors[parameter_name]
 
-        new_priors = PriorDict(dictionary=new_priors)
-        old_priors = PriorDict(dictionary=old_priors)
-
-        return get_ln_weights_for_reweighting(self.result, old_priors, new_priors, parameters)
+        new_prior_pdf = PriorDict(dictionary=new_priors).ln_prob({p: self.data[p] for p in parameters}, axis=0)
+        return new_prior_pdf - self.sampling_prior_pdf
 
     def compute_ln_weights_for_component_masses(self, z_src):
         det_frame_priors = DetectorFrameComponentMassesFromSourceFrame(
@@ -88,11 +98,8 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
             z_src=z_src
         )
 
-        old_priors = PriorDict(dictionary={
-            k: self.result.priors[k] for k in ["mass_1", "mass_2"]
-        })
-
-        return get_ln_weights_for_reweighting(self.result, old_priors, det_frame_priors, ["mass_1", "mass_2"])
+        new_prior_pdf = det_frame_priors.ln_prob({p: self.data[p] for p in ["mass_1", "mass_2"]})
+        return new_prior_pdf - self.sampling_prior_pdf
 
     def log_likelihood(self):
         z_src = self.parameters["redshift"]
