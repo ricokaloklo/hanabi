@@ -65,7 +65,7 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         # Extract only the relevant parameters
         parameters_to_extract = ["luminosity_distance" + self.suffix(trigger_idx) for trigger_idx, _ in enumerate(self.abs_magnification_prob_dists)]
         parameters_to_extract += ["mass_1", "mass_2"]
-        self.data = {p: self.result.posterior[p].to_numpy()[keep_idxs] for p in parameters_to_extract}
+        self.data = {p: self.result.posterior[p].to_numpy()[self.keep_idxs] for p in parameters_to_extract}
 
         # Evaluate the pdf of the sampling prior once and only once using numpy
         sampling_priors = PriorDict(dictionary={p: self.result.priors[p] for p in parameters_to_extract})
