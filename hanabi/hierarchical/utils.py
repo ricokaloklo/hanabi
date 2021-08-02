@@ -24,6 +24,12 @@ def enforce_mass_ordering(m1, m2):
             m2[idx] = tmp
     return m1, m2
 
+def downsample(n_original, n_samples=None):
+    keep_idxs = np.arange(n_original)
+    if n_samples is not None:
+        keep_idxs = np.random.choice(keep_idxs, size=n_samples)
+    return keep_idxs
+
 # This is a stripped-down version of bilby.core.result.get_weights_for_reweighting
 # Currently the function in bilby v1.0.2 is unusable if rejection sampling was used before
 def get_ln_weights_for_reweighting(result, old_priors, new_priors, parameters):

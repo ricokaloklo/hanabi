@@ -1,9 +1,11 @@
 import numpy as np
+import logging
 from scipy.special import logsumexp
 from astropy.cosmology import Planck15
 import bilby
-from bilby.core.prior import Prior, PriorDict
-from .utils import get_ln_weights_for_reweighting
+from bilby.core.prior import Prior
+from .utils import get_ln_weights_for_reweighting, downsample, setup_logger
+from .cupy_utils import _GPU_ENABLED, PriorDict
 from .marginalized_likelihood import DetectorFrameComponentMassesFromSourceFrame
 
 class LuminosityDistancePriorFromRedshift(Prior):
@@ -32,53 +34,80 @@ class LuminosityDistancePriorFromRedshift(Prior):
         return self.z_src_prob_dist.prob(z_src)*self.Jacobian(z_src)
 
 class ReweightWithPopulationModel(object):
-    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, z_src_prob_dist):
+    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, z_src_prob_dist, n_samples=None):
         self.result = result
 
         # Check if redshift is calculated and stored in result.posterior
         if not "redshift" in self.result.posterior.columns:
             self.result.posterior = bilby.gw.conversion.generate_source_frame_parameters(self.result.posterior)
 
+        # Downsample if n_samples is given
+        self.keep_idxs = downsample(len(self.result.posterior), n_samples)
+        # Extract only the relevant parameters
+        parameters_to_extract = ["luminosity_distance", "mass_1", "mass_2"]
+        self.data = {p: self.result.posterior[p].to_numpy()[self.keep_idxs] for p in parameters_to_extract}
+
+        # Evaluate the pdf of the sampling prior once and only once using numpy
+        sampling_priors = PriorDict(dictionary={p: self.result.priors[p] for p in parameters_to_extract})
+        self.sampling_prior_ln_prob = sampling_priors.ln_prob(self.data, axis=0)
+        self.data["redshift"] = self.result.posterior["redshift"].to_numpy(dtype=np.float64)[self.keep_idxs]
+         
+        logger = logging.getLogger("hanabi_hierarchical_analysis")
+        if _GPU_ENABLED:
+            # NOTE gwpopulation will automatically use GPU for computation (no way to disable that)
+            self.use_gpu = True
+            logger.info("Using GPU for reweighting")
+            import cupy as cp
+            # Move data to GPU
+            self.sampling_prior_ln_prob = cp.asarray(self.sampling_prior_ln_prob)
+            for k in self.data.keys():
+                self.data[k] = cp.asarray(self.data[k])
+        else:
+            # Fall back to numpy
+            self.use_gpu = False
+            logger.info("Using CPU for reweighting")
+
         self.mass_src_pop_model = mass_src_pop_model
         self.spin_src_pop_model = spin_src_pop_model
         self.z_src_prob_dist = z_src_prob_dist
         self.ln_weights = self.compute_ln_weights()
 
-    def compute_ln_weights_for_component_masses(self, z_src):
+    def compute_ln_prob_for_component_masses(self, z_src):
         det_frame_priors = DetectorFrameComponentMassesFromSourceFrame(
             self.mass_src_pop_model,
             z_src=z_src
         )
+        
+        new_prior_pdf = det_frame_priors.ln_prob({k: self.data[k] for k in ["mass_1", "mass_2"]}, axis=0)
+        return new_prior_pdf
 
-        old_priors = PriorDict(dictionary={
-            k: self.result.priors[k] for k in ["mass_1", "mass_2"]
-        })
+    def compute_ln_prob_for_luminosity_distances_from_redshift(self, z_src):
+        if self.use_gpu:
+            import cupy as cp
+            # Use CPU instead
+            z_src = cp.asnumpy(z_src)
 
-        return get_ln_weights_for_reweighting(self.result, old_priors, det_frame_priors, ["mass_1", "mass_2"])
+        new_prior_pdf = np.log(LuminosityDistancePriorFromRedshift(self.z_src_prob_dist).prob_from_z_src(z_src))
 
-    def compute_ln_weights_for_luminosity_distances(self):
-        old_priors = PriorDict(dictionary={"luminosity_distance": self.result.priors["luminosity_distance"]})
-        new_priors = PriorDict(dictionary={"luminosity_distance": LuminosityDistancePriorFromRedshift(self.z_src_prob_dist)})
+        if self.use_gpu:
+            new_prior_pdf = cp.asarray(new_prior_pdf)
 
-        return get_ln_weights_for_reweighting(self.result, old_priors, new_priors, ["luminosity_distance"])
-
-    def compute_ln_weights_for_luminosity_distances_from_redshift(self, z_src):
-        old_ln_prior_array = self.result.priors["luminosity_distance"].ln_prob(self.result.posterior["luminosity_distance"])
-        new_ln_prior_array = np.log(LuminosityDistancePriorFromRedshift(self.z_src_prob_dist).prob_from_z_src(z_src))
-
-        return new_ln_prior_array - old_ln_prior_array
+        return new_prior_pdf
 
     def compute_ln_weights(self):
-        z_src = self.result.posterior["redshift"].astype(np.float64)
-        ln_weights = self.compute_ln_weights_for_component_masses(z_src) + \
-            self.compute_ln_weights_for_luminosity_distances_from_redshift(z_src)
+        ln_weights = self.compute_ln_prob_for_component_masses(self.data["redshift"]) + \
+            self.compute_ln_prob_for_luminosity_distances_from_redshift(self.data["redshift"]) - \
+            self.sampling_prior_ln_prob
         
+        if self.use_gpu:
+            import cupy as cp
+            ln_weights = cp.asnumpy(ln_weights)
         return ln_weights
 
     def reweight_ln_evidence(self):
-        ln_Z = self.result.log_evidence + logsumexp(self.ln_weights) - np.log(len(self.result.posterior))
+        ln_Z = self.result.log_evidence + logsumexp(self.ln_weights) - np.log(len(self.ln_weights))
         return ln_Z
 
     def reweight_samples(self):
-        reweighted_samples = bilby.result.rejection_sample(self.result.posterior, np.exp(self.ln_weights))
+        reweighted_samples = bilby.result.rejection_sample(self.result.posterior.iloc[self.keep_idxs], np.exp(self.ln_weights))
         return reweighted_samples
