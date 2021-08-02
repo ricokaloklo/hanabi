@@ -1,7 +1,7 @@
 import numpy as np
 import bilby
 import logging
-from .utils import get_ln_weights_for_reweighting, setup_logger
+from .utils import get_ln_weights_for_reweighting, downsample, setup_logger
 from ..inference.utils import ParameterSuffix
 from .cupy_utils import _GPU_ENABLED, PriorDict, logsumexp
 from bilby.core.likelihood import Likelihood
@@ -60,10 +60,7 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
             self.suffix = suffix
 
         # Downsample if n_samples is given
-        keep_idxs = np.arange(len(self.result.posterior))
-        if n_samples is not None:
-            keep_idxs = np.random.choice(keep_idxs, size=n_samples)
-        self.keep_idxs = keep_idxs
+        self.keep_idxs = downsample(len(self.result.posterior), n_samples)
 
         # Extract only the relevant parameters
         parameters_to_extract = ["luminosity_distance" + self.suffix(trigger_idx) for trigger_idx, _ in enumerate(self.abs_magnification_prob_dists)]
@@ -72,26 +69,24 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
 
         # Evaluate the pdf of the sampling prior once and only once using numpy
         sampling_priors = PriorDict(dictionary={p: self.result.priors[p] for p in parameters_to_extract})
-        self.sampling_prior_pdf = sampling_priors.ln_prob(self.data, axis=0)
+        self.sampling_prior_ln_prob = sampling_priors.ln_prob(self.data, axis=0)
 
         logger = logging.getLogger("hanabi_hierarchical_analysis")
         if _GPU_ENABLED:
             # NOTE gwpopulation will automatically use GPU for computation (no way to disable that)
             self.use_gpu = True
             logger.info("Using GPU for likelihood evaluation")
+            import cupy as cp
+            # Move data to GPU
+            self.sampling_prior_ln_prob = cp.asarray(self.sampling_prior_ln_prob)
+            for k in self.data.keys():
+                self.data[k] = cp.asarray(self.data[k])
         else:
             # Fall back to numpy
             self.use_gpu = False
             logger.info("Using CPU for likelihood evaluation")
 
-        if self.use_gpu:
-            import cupy as cp
-            # Move data to GPU
-            self.sampling_prior_pdf = cp.asarray(self.sampling_prior_pdf)
-            for k in self.data.keys():
-                self.data[k] = cp.asarray(self.data[k])
-
-    def compute_ln_weights_for_luminosity_distances(self, z_src):
+    def compute_ln_prob_for_luminosity_distances(self, z_src):
         # Construct the prior dict for apparent luminosity distance
         new_priors = {}
         parameters = []
@@ -107,22 +102,21 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
                     unit="Mpc",
                 )
 
-        new_prior_pdf = PriorDict(dictionary=new_priors).ln_prob({p: self.data[p] for p in parameters}, axis=0)
-        return new_prior_pdf - self.sampling_prior_pdf
+        return PriorDict(dictionary=new_priors).ln_prob({p: self.data[p] for p in parameters}, axis=0)
 
-    def compute_ln_weights_for_component_masses(self, z_src):
+    def compute_ln_prob_for_component_masses(self, z_src):
         det_frame_priors = DetectorFrameComponentMassesFromSourceFrame(
             self.mass_src_pop_model,
             z_src=z_src
         )
 
-        new_prior_pdf = det_frame_priors.ln_prob({p: self.data[p] for p in ["mass_1", "mass_2"]})
-        return new_prior_pdf - self.sampling_prior_pdf
+        return det_frame_priors.ln_prob({p: self.data[p] for p in ["mass_1", "mass_2"]})
 
     def log_likelihood(self):
         z_src = self.parameters["redshift"]
-        ln_weights = self.compute_ln_weights_for_component_masses(z_src) + \
-            self.compute_ln_weights_for_luminosity_distances(z_src)
+        ln_weights = self.compute_ln_prob_for_component_masses(z_src) + \
+            self.compute_ln_prob_for_luminosity_distances(z_src) - \
+            self.sampling_prior_ln_prob
         ln_Z = self.result.log_evidence + logsumexp(ln_weights) - np.log(len(ln_weights))
 
         return ln_Z
