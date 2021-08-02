@@ -2,6 +2,7 @@ import numpy as np
 import bilby
 import pandas as pd
 from schwimmbad import SerialPool, MultiPool
+from .cupy_utils import _GPU_ENABLED
 
 class CustomCollapsedBlockedGibbsSampler(object):
     def __init__(self, redshift_result, marginalized_likelihood, random_seed=1234, pool=None):
@@ -20,8 +21,12 @@ class CustomCollapsedBlockedGibbsSampler(object):
         return self.draw_one_row_from_dataframe(redshift_samples)
 
     def draw_from_inference_posterior_given_redshift(self, z):
-        ln_weights = self.marginalized_likelihood.compute_ln_weights_for_component_masses(z) + \
-            self.marginalized_likelihood.compute_ln_weights_for_luminosity_distances(z)
+        ln_weights = self.marginalized_likelihood.compute_ln_prob_for_component_masses(z) + \
+            self.marginalized_likelihood.compute_ln_prob_for_luminosity_distances(z) - \
+            self.marginalized_likelihood.sampling_prior_ln_prob
+        if _GPU_ENABLED:
+            import cupy as cp
+            ln_weights = cp.asnumpy(ln_weights)
         reweighted_samples = bilby.result.rejection_sample(self.marginalized_likelihood.result.posterior, np.exp(ln_weights))
         return self.draw_one_row_from_dataframe(reweighted_samples)
 
