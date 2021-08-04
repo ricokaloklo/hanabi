@@ -14,6 +14,7 @@ from .merger_rate_density import MarginalizedMergerRateDensity
 from .p_z import LensedSourceRedshiftProbDist, NotLensedSourceRedshiftProbDist
 from .marginalized_likelihood import DetectorFrameComponentMassesFromSourceFrame, LuminosityDistancePriorFromAbsoluteMagnificationRedshift
 from .utils import setup_logger, enforce_mass_ordering, write_to_hdf5
+from .cupy_utils import _GPU_ENABLED
 from ..lensing.absolute_magnification import SISPowerLawAbsoluteMagnification
 from ..lensing.optical_depth import NotLensedOpticalDepth, Oguri2019StrongLensingProb
 
@@ -228,24 +229,44 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
         # Note that spins are redshift independent
         spin_1x, spin_1y, spin_1z = [self.fiducial_binaries[k] for k in ["spin_1x", "spin_1y", "spin_1z"]]
         spin_2x, spin_2y, spin_2z = [self.fiducial_binaries[k] for k in ["spin_2x", "spin_2y", "spin_2z"]]
-        pdf_spin_fiducial = self.pdf_spin_fiducial
-        pdf_spin_pop = self.spin_src_pop_model.prob(pd.DataFrame({
+
+        if _GPU_ENABLED:
+            import cupy as xp
+        else:
+            import numpy as xp
+        m1 = xp.asarray(m1)
+        m2 = xp.asarray(m2)
+        spin_1x = xp.asarray(spin_1x)
+        spin_1y = xp.asarray(spin_1y)
+        spin_1z = xp.asarray(spin_1z)
+        spin_2x = xp.asarray(spin_2x)
+        spin_2y = xp.asarray(spin_2y)
+        spin_2z = xp.asarray(spin_2z)
+        pdf_spin_fiducial = xp.asarray(self.pdf_spin_fiducial)
+        pdf_mass_fiducial = xp.asarray(self.pdf_mass_fiducial)
+
+        pdf_spin_pop = self.spin_src_pop_model.prob({
             "spin_1x": spin_1x,
             "spin_1y": spin_1y,
             "spin_1z": spin_1z,
             "spin_2x": spin_2x,
             "spin_2y": spin_2y,
             "spin_2z": spin_2z,
-        }))
+        })
         weights_spin = pdf_spin_pop/pdf_spin_fiducial
+
+        for img in range(self.N_img):
+            self.predictions[img] = xp.asarray(self.predictions[img])
+            self.pdf_dLs_fiducial[img] = xp.asarray(self.pdf_dLs_fiducial[img])
+            self.apparent_dLs[img] = xp.asarray(self.apparent_dLs[img])
 
         def epsilon(z_src):
             det_mass_pop_dist = DetectorFrameComponentMassesFromSourceFrame(self.mass_src_pop_model, z_src)
-            pdf_mass_pop = det_mass_pop_dist.prob(pd.DataFrame({"mass_1": m1, "mass_2": m2}))
-            weights_mass = pdf_mass_pop/self.pdf_mass_fiducial
+            pdf_mass_pop = det_mass_pop_dist.prob({"mass_1": m1, "mass_2": m2})
+            weights_mass = pdf_mass_pop/pdf_mass_fiducial
             weights_source = weights_mass * weights_spin
-
             integrand = weights_source
+
             for img in range(self.N_img):
                 pdf_dL_fiducial = self.pdf_dLs_fiducial[img]
                 dL_pop_dist = LuminosityDistancePriorFromAbsoluteMagnificationRedshift(self.abs_magn_dist[img], z_src)
@@ -253,7 +274,7 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
                 weights_dL = pdf_dL_pop/pdf_dL_fiducial
                 integrand *= self.predictions[img]*weights_dL
 
-            return np.sum(integrand)/float(self.N_inj)
+            return float(xp.sum(integrand)/float(self.N_inj))
 
         logger = logging.getLogger(__prog__)
         logger.info("Integrating over source redshift")
@@ -402,38 +423,58 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
         self.load_from_file()
 
         # Perform MC reweighting
+        if _GPU_ENABLED:
+            import cupy as xp
+        else:
+            import numpy as xp
+
         m1_src = self.fiducial_binaries["mass_1_source"]
         m2_src = self.fiducial_binaries["mass_2_source"]
-        pdf_mass_fiducial = self.pdf_mass_fiducial
-        pdf_mass_pop = self.mass_src_pop_model.prob(pd.DataFrame({"mass_1_source": m1_src, "mass_2_source": m2_src}), axis=0)
-        weights_mass = pdf_mass_pop/pdf_mass_fiducial
-
         spin_1x, spin_1y, spin_1z = [self.fiducial_binaries[k] for k in ["spin_1x", "spin_1y", "spin_1z"]]
         spin_2x, spin_2y, spin_2z = [self.fiducial_binaries[k] for k in ["spin_2x", "spin_2y", "spin_2z"]]
+        pdf_mass_fiducial = self.pdf_mass_fiducial
         pdf_spin_fiducial = self.pdf_spin_fiducial
-        pdf_spin_pop = self.spin_src_pop_model.prob(pd.DataFrame({
+
+        # Move data to GPU if needed
+        m1_src = xp.asarray(m1_src)
+        m2_src = xp.asarray(m2_src)
+        spin_1x = xp.asarray(spin_1x)
+        spin_1y = xp.asarray(spin_1y)
+        spin_1z = xp.asarray(spin_1z)
+        spin_2x = xp.asarray(spin_2x)
+        spin_2y = xp.asarray(spin_2y)
+        spin_2z = xp.asarray(spin_2z)
+        pdf_mass_fiducial = xp.asarray(pdf_mass_fiducial)
+        pdf_spin_fiducial = xp.asarray(pdf_spin_fiducial)
+
+        pdf_mass_pop = self.mass_src_pop_model.prob({"mass_1_source": m1_src, "mass_2_source": m2_src}, axis=0)
+        weights_mass = pdf_mass_pop/pdf_mass_fiducial      
+        pdf_spin_pop = self.spin_src_pop_model.prob({
             "spin_1x": spin_1x,
             "spin_1y": spin_1y,
             "spin_1z": spin_1z,
             "spin_2x": spin_2x,
             "spin_2y": spin_2y,
             "spin_2z": spin_2z,
-        }))
+        })
         weights_spin = pdf_spin_pop/pdf_spin_fiducial
 
         weights_source = weights_mass * weights_spin
 
+        # NOTE For now, we have to use CPU to evaluate this
         z = self.fiducial_z
         pz = NotLensedSourceRedshiftProbDist(merger_rate_density=self.merger_rate_density_src_pop_model, optical_depth=self.optical_depth)
         pdf_z_fiducial = self.pdf_z_fiducial
         pdf_z_pop = pz.prob(z)
         weights_z = pdf_z_pop/pdf_z_fiducial
 
-        predictions = self.predictions
-        alpha = np.sum(predictions*weights_source*weights_z).astype(float)/(len(m1_src))
+        predictions = xp.asarray(self.predictions)
+        weights_z = xp.asarray(weights_z)
+        alpha = xp.sum(predictions*weights_source*weights_z).astype(float)/(len(m1_src))
         
         self.f.close()
-        return alpha
+        # NOTE If using numpy, alpha is a scalar but if using cupy, alpha is a 0-d array
+        return float(alpha)
 
 class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
     def __init__(
