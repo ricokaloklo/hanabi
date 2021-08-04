@@ -3,12 +3,12 @@ import pandas as pd
 import scipy.integrate
 import scipy.interpolate
 import bilby
-from bilby.core.prior import Interped
 from .merger_rate_density import MergerRateDensity, MarginalizedMergerRateDensity
 from ..lensing.optical_depth import *
 from ..lensing.absolute_magnification import *
+from .cupy_utils import Interped as InterpedGPUEnabled
 
-class SourceRedshiftProbDist(Interped):
+class SourceRedshiftProbDist(InterpedGPUEnabled):
     def __init__(self, merger_rate_density, name=None, latex_label=None):
         self.redshift_max = merger_rate_density.population_parameter_dict["redshift_max"]
         self.merger_rate_density = merger_rate_density

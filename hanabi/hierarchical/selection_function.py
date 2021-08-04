@@ -461,17 +461,15 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
 
         weights_source = weights_mass * weights_spin
 
-        # NOTE For now, we have to use CPU to evaluate this
-        z = self.fiducial_z
+        z = xp.asarray(self.fiducial_z)
         pz = NotLensedSourceRedshiftProbDist(merger_rate_density=self.merger_rate_density_src_pop_model, optical_depth=self.optical_depth)
-        pdf_z_fiducial = self.pdf_z_fiducial
+        pdf_z_fiducial = xp.asarray(self.pdf_z_fiducial)
         pdf_z_pop = pz.prob(z)
         weights_z = pdf_z_pop/pdf_z_fiducial
 
         predictions = xp.asarray(self.predictions)
-        weights_z = xp.asarray(weights_z)
         alpha = xp.sum(predictions*weights_source*weights_z).astype(float)/(len(m1_src))
-        
+
         self.f.close()
         # NOTE If using numpy, alpha is a scalar but if using cupy, alpha is a 0-d array
         return float(alpha)
