@@ -175,26 +175,31 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
             images[img]['z'] = apparent_zs[img]
             images[img]['predictions'] = pdetclassifier.predictnetwork(model, images[img])
 
+        binaries_to_save = np.ones_like(images[0]['predictions'])
+        for img in range(self.N_img):
+            binaries_to_save *= (images[img]['predictions'] != 0)
+        binaries_to_save = np.array(binaries_to_save, dtype=bool)
+
         # Save output to file
         logger.info(f"Saving to file {self.filename}")
         output_dataset = \
         {
             "binaries": {
-                "mass_1": m1,
-                "mass_2": m2,
-                "spin_1x": spin_1x,
-                "spin_1y": spin_1y,
-                "spin_1z": spin_1z,
-                "spin_2x": spin_2x,
-                "spin_2y": spin_2y,
-                "spin_2z": spin_2z,
-                "pdf_mass": pdf_mass_fiducial,
-                "pdf_spin": pdf_spin_fiducial,
+                "mass_1": m1[binaries_to_save],
+                "mass_2": m2[binaries_to_save],
+                "spin_1x": spin_1x[binaries_to_save],
+                "spin_1y": spin_1y[binaries_to_save],
+                "spin_1z": spin_1z[binaries_to_save],
+                "spin_2x": spin_2x[binaries_to_save],
+                "spin_2y": spin_2y[binaries_to_save],
+                "spin_2z": spin_2z[binaries_to_save],
+                "pdf_mass": pdf_mass_fiducial[binaries_to_save],
+                "pdf_spin": pdf_spin_fiducial[binaries_to_save],
             }
         }
         for img in range(self.N_img):
-            output_dataset["apparent_luminosity_distance_{}".format(img+1)] = {"d_L": apparent_dLs[img], "pdf": pdf_dLs_fiducial[img]}
-            output_dataset["predictions_{}".format(img+1)] = {"prediction": images[img]['predictions']}
+            output_dataset["apparent_luminosity_distance_{}".format(img+1)] = {"d_L": apparent_dLs[img][binaries_to_save], "pdf": pdf_dLs_fiducial[img][binaries_to_save]}
+            output_dataset["predictions_{}".format(img+1)] = {"prediction": images[img]['predictions'][binaries_to_save]}
 
         write_to_hdf5(
             self.filename,
@@ -211,6 +216,8 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
         logger = logging.getLogger(__prog__)
         logger.info(f"Reading from file {self.filename}")
         self.f = h5py.File(self.filename, "r")
+        self.N_inj = self.f.attrs["N_inj"]
+        self.N_img = int(self.f.attrs["N_img"])
         self.fiducial_binaries = self.f["binaries"]
         self.pdf_mass_fiducial = self.f["binaries"]["pdf_mass"]
         self.pdf_spin_fiducial = self.f["binaries"]["pdf_spin"]
@@ -280,6 +287,9 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
         logger.info("Integrating over source redshift")
         z_dist = LensedSourceRedshiftProbDist(merger_rate_density=self.merger_rate_density_src_pop_model, optical_depth=self.optical_depth)
         zs = z_dist.sample(size=self.N_z)
+        if _GPU_ENABLED:
+            import cupy as cp
+            zs = cp.asnumpy(zs)
         epsilons = []
         for z in tqdm.tqdm(zs):
             epsilons.append(epsilon(z))
@@ -379,25 +389,26 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
         model = pdetclassifier.loadnetwork(self.trained_model)
         predictions = pdetclassifier.predictnetwork(model, binaries)
 
+        binaries_to_save = (predictions != 0)
         # Save output to file
         logger.info(f"Saving to file {self.filename}")
         write_to_hdf5(
             self.filename,
             {
                 "binaries": {
-                    "mass_1_source": m1_src,
-                    "mass_2_source": m2_src,
-                    "spin_1x": spin_1x,
-                    "spin_1y": spin_1y,
-                    "spin_1z": spin_1z,
-                    "spin_2x": spin_2x,
-                    "spin_2y": spin_2y,
-                    "spin_2z": spin_2z,
-                    "pdf_mass": pdf_mass_fiducial,
-                    "pdf_spin": pdf_spin_fiducial,
+                    "mass_1_source": m1_src[binaries_to_save],
+                    "mass_2_source": m2_src[binaries_to_save],
+                    "spin_1x": spin_1x[binaries_to_save],
+                    "spin_1y": spin_1y[binaries_to_save],
+                    "spin_1z": spin_1z[binaries_to_save],
+                    "spin_2x": spin_2x[binaries_to_save],
+                    "spin_2y": spin_2y[binaries_to_save],
+                    "spin_2z": spin_2z[binaries_to_save],
+                    "pdf_mass": pdf_mass_fiducial[binaries_to_save],
+                    "pdf_spin": pdf_spin_fiducial[binaries_to_save],
                 },
-                "redshifts": {"z": z, "pdf": pdf_z_fiducial},
-                "predictions": {"prediction": predictions},
+                "redshifts": {"z": z[binaries_to_save], "pdf": pdf_z_fiducial[binaries_to_save]},
+                "predictions": {"prediction": predictions[binaries_to_save]},
             },
             {
                 "mmin": mmin,
@@ -412,6 +423,7 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
         logger = logging.getLogger(__prog__)
         logger.info(f"Reading from file {self.filename}")
         self.f = h5py.File(self.filename, "r")
+        self.N_inj = self.f.attrs["N_inj"]
         self.fiducial_binaries = self.f["binaries"]
         self.pdf_mass_fiducial = self.f["binaries"]["pdf_mass"]
         self.pdf_spin_fiducial = self.f["binaries"]["pdf_spin"]
@@ -468,7 +480,7 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
         weights_z = pdf_z_pop/pdf_z_fiducial
 
         predictions = xp.asarray(self.predictions)
-        alpha = xp.sum(predictions*weights_source*weights_z).astype(float)/(len(m1_src))
+        alpha = xp.sum(predictions*weights_source*weights_z).astype(float)/(float(self.N_inj))
 
         self.f.close()
         # NOTE If using numpy, alpha is a scalar but if using cupy, alpha is a 0-d array
