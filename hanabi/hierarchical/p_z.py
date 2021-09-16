@@ -6,9 +6,10 @@ import bilby
 from .merger_rate_density import MergerRateDensity, MarginalizedMergerRateDensity
 from ..lensing.optical_depth import *
 from ..lensing.absolute_magnification import *
+from bilby.core.prior import Interped as InterpedCPUOnly
 from .cupy_utils import Interped as InterpedGPUEnabled
 
-class SourceRedshiftProbDist(InterpedGPUEnabled):
+class SourceRedshiftProbDist(InterpedCPUOnly):
     def __init__(self, merger_rate_density, name=None, latex_label=None):
         self.redshift_max = merger_rate_density.population_parameter_dict["redshift_max"]
         self.merger_rate_density = merger_rate_density
