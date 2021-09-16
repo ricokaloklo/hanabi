@@ -7,6 +7,11 @@ from .cupy_utils import _GPU_ENABLED, PriorDict, logsumexp
 from bilby.core.likelihood import Likelihood
 from bilby.core.prior import Prior
 
+if _GPU_ENABLED:
+    import cupy as xp
+else:
+    import numpy as xp
+
 class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
     def __init__(self, abs_magnification_prob_dist, z_src, name=None, latex_label=None, unit=None):
         super(LuminosityDistancePriorFromAbsoluteMagnificationRedshift, self).__init__(
@@ -32,16 +37,16 @@ class DetectorFrameComponentMassesFromSourceFrame(object):
         self.z_src = z_src
 
     def Jacobian(self):
-        return np.power((1. + self.z_src), -2)
+        return (1. + self.z_src)**-2
 
     def prob(self, dataset, axis=None):
         return self.mass_src_pop_model.prob({k+"_source": dataset[k]/(1.+self.z_src) for k in ["mass_1", "mass_2"]}, axis=axis)*self.Jacobian()
 
     def ln_prob(self, dataset, axis=None):
-        return np.log(self.prob(dataset, axis=axis))
+        return xp.log(self.prob(dataset, axis=axis))
 
 class MonteCarloMarginalizedLikelihood(Likelihood):
-    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, sep_char="^", suffix=None, n_samples=None):
+    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, sampling_priors=None, sep_char="^", suffix=None, n_samples=None):
         # The likelihood is a function of the source redshift only
         # Might as well do this marginalization deterministically
         self.parameters = {'redshift': 0.0}
@@ -68,7 +73,8 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         self.data = {p: self.result.posterior[p].to_numpy()[self.keep_idxs] for p in parameters_to_extract}
 
         # Evaluate the pdf of the sampling prior once and only once using numpy
-        sampling_priors = PriorDict(dictionary={p: self.result.priors[p] for p in parameters_to_extract})
+        if sampling_priors is None:
+            sampling_priors = bilby.core.prior.PriorDict(dictionary={p: self.result.priors[p] for p in parameters_to_extract})
         self.sampling_prior_ln_prob = sampling_priors.ln_prob(self.data, axis=0)
 
         logger = logging.getLogger("hanabi_hierarchical_analysis")
@@ -110,10 +116,10 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
             z_src=z_src
         )
 
-        return det_frame_priors.ln_prob({p: self.data[p] for p in ["mass_1", "mass_2"]})
+        return det_frame_priors.ln_prob({p: self.data[p] for p in ["mass_1", "mass_2"]}, axis=0)
 
     def log_likelihood(self):
-        z_src = self.parameters["redshift"]
+        z_src = float(self.parameters["redshift"])
         ln_weights = self.compute_ln_prob_for_component_masses(z_src) + \
             self.compute_ln_prob_for_luminosity_distances(z_src) - \
             self.sampling_prior_ln_prob
