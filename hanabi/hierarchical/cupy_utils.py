@@ -24,7 +24,23 @@ class PriorDict(bilby.core.prior.PriorDict):
         else:
             return super(PriorDict, self).ln_prob(sample, axis=axis)
 
+    def prob(self, sample, **kwargs):
+        if _GPU_ENABLED:
+            prob = cp.prod(cp.asarray([self[key].prob(sample[key])
+                           for key in sample]), **kwargs)
+            return prob
+        else:
+            return super(PriorDict, self).prob(sample, **kwargs)
+
 # This is a much faster (but stripped down) & CPU/GPU-agnostic implementation of Interped in bilby
+class Interp(object):
+    def __init__(self, xx, yy):
+        self.xx = xx
+        self.yy = yy
+
+    def __call__(self, x):
+        return xp.interp(xp.asarray(x), self.xx, self.yy)
+
 class Interped(bilby.core.prior.interpolated.Interped):
     def __init__(self, xx, yy, minimum=xp.nan, maximum=xp.nan, name=None,
                  latex_label=None, unit=None, boundary=None):
@@ -41,7 +57,7 @@ class Interped(bilby.core.prior.interpolated.Interped):
         self.probability_density = None
         self.cumulative_distribution = None
         self.inverse_cumulative_distribution = None
-        self.__all_interpolated = lambda x: xp.interp(xp.asarray(x), self.xx, self._yy)
+        self.__all_interpolated = Interp(self.xx, self._yy)
         minimum = float(xp.nanmax(xp.array([self.min_limit, minimum])))
         maximum = float(xp.nanmin(xp.array([self.max_limit, maximum])))
         bilby.core.prior.Prior.__init__(self, name=name, latex_label=latex_label, unit=unit, minimum=minimum, maximum=maximum, boundary=boundary)
@@ -63,7 +79,7 @@ class Interped(bilby.core.prior.interpolated.Interped):
     @yy.setter
     def yy(self, yy):
         self._yy = xp.asarray(yy)
-        self.__all_interpolated = lambda x: xp.interp(xp.asarray(x), xp.asarray(self.xx), xp.asarray(self._yy))
+        self.__all_interpolated = Interp(xp.asarray(self.xx), xp.asarray(self._yy))
         self._update_instance()
 
     def _update_instance(self):
@@ -75,9 +91,9 @@ class Interped(bilby.core.prior.interpolated.Interped):
         self._yy /= trapz(self._yy, self.xx)
         self.YY = cumtrapz(self._yy, self.xx, initial=0)
         self.YY[-1] = 1
-        self.probability_density = lambda x: xp.interp(xp.asarray(x), self.xx, self._yy)
-        self.cumulative_distribution = lambda x: xp.interp(xp.asarray(x), self.xx, self.YY)
-        self.inverse_cumulative_distribution = lambda x: xp.interp(xp.asarray(x), self.YY, self.xx)
+        self.probability_density = Interp(self.xx, self._yy)
+        self.cumulative_distribution = Interp(self.xx, self.YY)
+        self.inverse_cumulative_distribution = Interp(self.YY, self.xx)
 
 def cumulative_trapezoid(y, x=None, dx=1.0, axis=-1, initial=None):
     if _GPU_ENABLED:
