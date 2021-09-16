@@ -43,7 +43,7 @@ class CustomCollapsedBlockedGibbsSampler(object):
         return self.draw_one_joint_posterior_sample()
 
     def sample(self, n_samples):
-        if self.pool is None:
+        if self.pool is None or _GPU_ENABLED:
             pool = SerialPool()
         else:
             if isinstance(self.pool, int):
