@@ -31,6 +31,37 @@ class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
         return self.abs_magnification_prob_dist.prob(mu_abs)*self.Jacobian(d_L)
 
 # NOTE This is not a full-blown bilby PriorDict but it does the job!
+class LuminosityDistanceJointPriorFromMagnificationJointDist(object):
+    def __init__(self, magnification_joint_distribution, z_src, sep_char="^", suffix=None):
+        self.magnification_joint_distribution = magnification_joint_distribution
+        self.z_src = z_src
+        # Do redshift -> d_L conversion only once
+        self.d_L_src = bilby.gw.conversion.redshift_to_luminosity_distance(z_src)
+        self.sep_char = sep_char
+        if suffix is None:
+            self.suffix = ParameterSuffix(self.sep_char)
+        else:
+            self.suffix = suffix
+
+    def Jacobian(self, mu):
+        return 2.0 * mu**1.5 / self.d_L_src
+
+    def prob(self, dataset, axis=None):
+        # Convert apparent luminosity distances to absolute magnification first
+        mu_abs = {k: (self.d_L_src/dataset["luminosity_distance"+self.suffix(i)])**2 for i, k in enumerate(self.magnification_joint_distribution.keys())}
+        # Evaluate joint prior probability (can be independent or conditional)
+        joint_prob = self.magnification_joint_distribution.prob(mu_abs, axis=axis)
+
+        overall_Jacobian = 1
+        for mu in mu_abs.values():
+            overall_Jacobian *= self.Jacobian(mu)
+
+        return joint_prob*overall_Jacobian
+
+    def ln_prob(self, dataset, axis=None):
+        return xp.log(self.prob(dataset, axis=axis))
+
+# NOTE This is not a full-blown bilby PriorDict but it does the job!
 class DetectorFrameComponentMassesFromSourceFrame(object):
     def __init__(self, mass_src_pop_model, z_src):
         self.mass_src_pop_model = mass_src_pop_model
@@ -46,7 +77,7 @@ class DetectorFrameComponentMassesFromSourceFrame(object):
         return xp.log(self.prob(dataset, axis=axis))
 
 class MonteCarloMarginalizedLikelihood(Likelihood):
-    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, abs_magnification_prob_dists, sampling_priors=None, sep_char="^", suffix=None, n_samples=None):
+    def __init__(self, result, mass_src_pop_model, spin_src_pop_model, magnification_joint_distribution, sampling_priors=None, sep_char="^", suffix=None, n_samples=None):
         # The likelihood is a function of the source redshift only
         # Might as well do this marginalization deterministically
         self.parameters = {'redshift': 0.0}
@@ -55,8 +86,6 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         self.result = result
         self.mass_src_pop_model = mass_src_pop_model
         self.spin_src_pop_model = spin_src_pop_model
-        # This should be a list of abs_magnification_prob_dist
-        self.abs_magnification_prob_dists = abs_magnification_prob_dists
 
         self.sep_char = sep_char
         if suffix is None:
@@ -64,11 +93,21 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         else:
             self.suffix = suffix
 
+        # Backward compatibility: previously we expect the 4th argument to be a list of absolute magnification distributions
+        if type(magnification_joint_distribution) is list:
+            magnification_joint_distribution = {"absolute_magnification" + "_{}".format(i+1): magnification_joint_distribution[i] for i in range(len(magnification_joint_distribution))}
+        # NOTE The default suffix ^(_) is not compatible with variable naming rules in python
+        for k in list(magnification_joint_distribution.keys()):
+            # Check if the default suffix is in the keys
+            if not k.isidentifier():
+                raise NameError("{} is not a valid variable name in python. Please rename the parameter (e.g. absolute_magnification_1 instead)".format(k))
+        self.magnification_joint_distribution = PriorDict(magnification_joint_distribution)
+
         # Downsample if n_samples is given
         self.keep_idxs = downsample(len(self.result.posterior), n_samples)
 
         # Extract only the relevant parameters
-        parameters_to_extract = ["luminosity_distance" + self.suffix(trigger_idx) for trigger_idx, _ in enumerate(self.abs_magnification_prob_dists)]
+        parameters_to_extract = ["luminosity_distance" + self.suffix(trigger_idx) for trigger_idx, _ in enumerate(self.magnification_joint_distribution.keys())]
         parameters_to_extract += ["mass_1", "mass_2"]
         self.data = {p: self.result.posterior[p].to_numpy()[self.keep_idxs] for p in parameters_to_extract}
 
@@ -93,22 +132,15 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
             logger.info("Using CPU for likelihood evaluation")
 
     def compute_ln_prob_for_luminosity_distances(self, z_src):
-        # Construct the prior dict for apparent luminosity distance
-        new_priors = {}
-        parameters = []
+        parameters = ["luminosity_distance" + self.suffix(trigger_idx) for trigger_idx, _ in enumerate(self.magnification_joint_distribution.keys())]
+        new_priors = LuminosityDistanceJointPriorFromMagnificationJointDist(
+            self.magnification_joint_distribution,
+            z_src,
+            sep_char=self.sep_char,
+            suffix=self.suffix
+        )
 
-        for trigger_idx, abs_magn in enumerate(self.abs_magnification_prob_dists):
-            parameter_name = "luminosity_distance"+self.suffix(trigger_idx)
-            parameters.append(parameter_name)
-            new_priors[parameter_name] = \
-                LuminosityDistancePriorFromAbsoluteMagnificationRedshift(
-                    abs_magnification_prob_dist=abs_magn,
-                    z_src=z_src,
-                    name=parameter_name,
-                    unit="Mpc",
-                )
-
-        return PriorDict(dictionary=new_priors).ln_prob({p: self.data[p] for p in parameters}, axis=0)
+        return new_priors.ln_prob({p: self.data[p] for p in parameters}, axis=0)
 
     def compute_ln_prob_for_component_masses(self, z_src):
         det_frame_priors = DetectorFrameComponentMassesFromSourceFrame(
@@ -124,5 +156,4 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
             self.compute_ln_prob_for_luminosity_distances(z_src) - \
             self.sampling_prior_ln_prob
         ln_Z = self.result.log_evidence + logsumexp(ln_weights) - np.log(len(ln_weights))
-
-        return ln_Z
+        return np.nan_to_num(ln_Z, nan=-np.inf)
