@@ -101,7 +101,7 @@ def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
         handler.setLevel(level)
 
 def get_version_information():
-    version_file = Path(__file__).parent / ".version"
+    version_file = Path(__file__).parents[1] / ".version"
     try:
         with open(version_file, "r") as f:
             return f.readline().rstrip()
