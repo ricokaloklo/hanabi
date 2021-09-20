@@ -1,6 +1,7 @@
 import bilby_pipe
 import logging
 import os
+from pathlib import Path
 from .._version import __version__
 
 class ParameterSuffix(object):
