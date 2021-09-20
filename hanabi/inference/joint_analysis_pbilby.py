@@ -617,6 +617,7 @@ with MPIPool(
         result.meta_data["likelihood"] = {} # Probably empty
         result.meta_data["sampler_kwargs"] = init_sampler_kwargs
         result.meta_data["run_sampler_kwargs"] = sampler_kwargs
+        result.meta_data["hanabi_version"] = __version__
 
         result.log_likelihood_evaluations = reorder_loglikelihoods(
             unsorted_loglikelihoods=out.logl,
