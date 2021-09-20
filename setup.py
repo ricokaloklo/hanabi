@@ -63,13 +63,14 @@ setuptools.setup(
         "hanabi.hierarchical"
     ],
     package_data={
+        "hanabi": [version_file],
         "hanabi.hierarchical": ["data/o3a_bbhpop_inj_info.hdf",
                                 "pdetclassifier/pdetclassifier.py",
                                 "pdetclassifier/compute_selection_functions.py"
                                 "pdetclassifier/trained_2e7_O3_precessing_higherordermodes_3detectors.h5",
                                 "pdetclassifier/trained_2e7_O1O2_precessing_higherordermodes_3detectors.h5",
                                 "pdetclassifier/trained_2e7_design_precessing_higherordermodes_3detectors.h5",
-        ]
+        ],
     },
     entry_points={
         "console_scripts": [
