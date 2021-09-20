@@ -1,4 +1,6 @@
 import setuptools
+import subprocess
+from pathlib import Path
 
 # Read hanabi/_version.py
 # Code from StackOverflow: https://stackoverflow.com/questions/458550/standard-way-to-embed-version-into-python-package
@@ -11,6 +13,40 @@ if mo:
     verstr = mo.group(1)
 else:
     raise RuntimeError("Unable to find version string in %s." % (VERSIONFILE,))
+
+# Write a more detailed version file
+# Code modified from bilby_pipe
+def write_version_file(version):
+    version_file = Path("hanabi") / ".version"
+
+    try:
+        git_log = subprocess.check_output(
+            ["git", "log", "-1", "--pretty=%h %ai"]
+        ).decode("utf-8")
+        git_diff = (
+            subprocess.check_output(["git", "diff", "."])
+            + subprocess.check_output(["git", "diff", "--cached", "."])
+        ).decode("utf-8")
+    except subprocess.CalledProcessError:  # git calls failed
+        # we already have a version file, let's use it
+        if version_file.is_file():
+            return version_file.name
+        # otherwise just return the version information
+        else:
+            git_version = version
+    else:
+        git_version = "{}: ({}) {}".format(
+            version, "UNCLEAN" if git_diff else "CLEAN", git_log.rstrip()
+        )
+        print(f"parsed git version info as: {git_version!r}")
+
+    with open(version_file, "w") as f:
+        print(git_version, file=f)
+        print(f"created {version_file}")
+
+    return version_file.name
+
+version_file = write_version_file(verstr)
 
 setuptools.setup(
     name="hanabi",
