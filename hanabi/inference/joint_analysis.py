@@ -26,7 +26,8 @@ from .utils import setup_logger
 from .utils import ParameterSuffix
 from .parser import create_joint_analysis_parser
 
-from .._version import __version__
+from .utils import get_version_information
+__version__ = get_version_information()
 __prog__ = "hanabi_joint_analysis"
 
 def sighandler(signum, frame):

@@ -11,7 +11,8 @@ from .gibbs_sampling import CustomCollapsedBlockedGibbsSampler
 from .parser import create_hierarchical_analysis_parser
 from .utils import setup_logger
 
-from .._version import __version__
+from .utils import get_version_information
+__version__ = get_version_information()
 __prog__ = "hanabi_hierarchical_analysis"
 
 class HierarchicalAnalysisInput(object):

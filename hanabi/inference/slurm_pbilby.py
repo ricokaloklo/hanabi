@@ -7,7 +7,8 @@ from parallel_bilby.slurm import (
     BaseNode,
     MergeNodes,
 )
-from .._version import __version__
+from .utils import get_version_information
+__version__ = get_version_information()
 
 
 def setup_submit(data_dump_files, inputs, args):

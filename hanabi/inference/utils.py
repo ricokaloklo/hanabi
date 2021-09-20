@@ -1,6 +1,7 @@
 import bilby_pipe
 import logging
 import os
+from .._version import __version__
 
 class ParameterSuffix(object):
     def __init__(self, sep_char="^"):
@@ -97,6 +98,15 @@ def setup_logger(prog_name, outdir=None, label=None, log_level="INFO"):
 
     for handler in logger.handlers:
         handler.setLevel(level)
+
+def get_version_information():
+    version_file = Path(__file__).parent / ".version"
+    try:
+        with open(version_file, "r") as f:
+            return f.readline().rstrip()
+    except FileNotFoundError:
+        print("No version information file '.version' found")
+        return __version__
 
 # Initialize a logger for hanabi_joint_pipe
 setup_logger("hanabi_joint_pipe")

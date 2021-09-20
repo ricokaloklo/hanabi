@@ -10,7 +10,8 @@ from .parser import create_joint_generation_pbilby_parser
 from .utils import write_complete_config_file as _write_complete_config_file
 from .slurm_pbilby import setup_submit
 
-from .._version import __version__
+from .utils import get_version_information
+__version__ = get_version_information()
 __prog__ = "hanabi_joint_pipe_pbilby"
 
 logger = logging.getLogger(__prog__)

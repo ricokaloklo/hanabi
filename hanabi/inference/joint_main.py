@@ -19,7 +19,8 @@ from .utils import (
 )
 
 from .parser import create_joint_main_parser, print_unrecognized_arguments
-from .._version import __version__
+from .utils import get_version_information
+__version__ = get_version_information()
 
 __prog__ = "hanabi_joint_pipe"
 

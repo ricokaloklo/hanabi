@@ -40,7 +40,8 @@ mpi4py.rc.threads = False
 mpi4py.rc.recv_mprobe = False
 
 from .joint_analysis import JointDataAnalysisInput as JointDataAnalysisInputForBilby
-from .._version import __version__
+from .utils import get_version_information
+__version__ = get_version_information()
 __prog__ = "hanabi_joint_analysis_pbilby"
 logger = logging.getLogger(__prog__)
 
