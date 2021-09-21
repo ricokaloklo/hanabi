@@ -25,6 +25,8 @@ from bilby.gw import conversion
 from dynesty import NestedSampler
 from pandas import DataFrame
 
+from bilby_pipe import __version__ as bilby_pipe_version
+from parallel_bilby import __version__ as parallel_bilby_version
 from .parser import create_joint_analysis_pbilby_parser
 from ..lensing.conversion import convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
 from parallel_bilby.schwimmbad_fast import MPIPoolFast as MPIPool
@@ -617,6 +619,9 @@ with MPIPool(
         result.meta_data["likelihood"] = {} # Probably empty
         result.meta_data["sampler_kwargs"] = init_sampler_kwargs
         result.meta_data["run_sampler_kwargs"] = sampler_kwargs
+        result.meta_data["bilby_version"] = bilby.__version__
+        result.meta_data["bilby_pipe_version"] = bilby_pipe_version
+        result.meta_data["parallel_bilby_version"] = parallel_bilby_version
         result.meta_data["hanabi_version"] = __version__
 
         result.log_likelihood_evaluations = reorder_loglikelihoods(

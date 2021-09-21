@@ -232,7 +232,11 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
             label=self.label,
             outdir=self.result_directory,
             exit_code=CHECKPOINT_EXIT_CODE,
-            meta_data={"hanabi_version": __version__},
+            meta_data={
+                "bilby_version": bilby.__version__,
+                "bilby_pipe_version": bilby_pipe.__version__,
+                "hanabi_version": __version__,
+            },
             **self.sampler_kwargs
         )
 
