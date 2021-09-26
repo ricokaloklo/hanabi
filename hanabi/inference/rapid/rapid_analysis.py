@@ -75,7 +75,6 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
 
     def initialize_single_trigger_inference_inputs(self):
         self.single_trigger_likelihoods = []
-        self.single_trigger_likelihoods_with_cache = []
         self.single_trigger_priors = []
         self.single_trigger_results = []
 
@@ -98,7 +97,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
 
             single_trigger_likelihood.priors = priors
 
-            single_trigger_likelihood_with_cache = SingleLikelihoodWithTransformableWaveformCache.from_likelihood(
+            single_trigger_likelihood = SingleLikelihoodWithTransformableWaveformCache.from_likelihood(
                 single_trigger_likelihood,
                 time_marginalization=self.time_marginalization,
                 distance_marginalization=self.distance_marginalization,
@@ -106,12 +105,11 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             )
             if self.time_marginalization:
                 # Necessary to make time marginalization works
-                single_trigger_likelihood_with_cache.parameters.update({
-                    "geocent_time": float(single_trigger_likelihood_with_cache.interferometers.start_time)
+                single_trigger_likelihood.parameters.update({
+                    "geocent_time": float(single_trigger_likelihood.interferometers.start_time)
                 })
 
             self.single_trigger_likelihoods.append(single_trigger_likelihood)
-            self.single_trigger_likelihoods_with_cache.append(single_trigger_likelihood_with_cache)
             self.single_trigger_priors.append(priors)
             self.single_trigger_results.append(single_trigger_result)
 
@@ -120,7 +118,6 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             inference = ConditionalInference(
                 combo,
                 self.single_trigger_likelihoods,
-                self.single_trigger_likelihoods_with_cache,
                 self.single_trigger_priors,
                 self.single_trigger_results,
                 self.n_posterior,
@@ -146,7 +143,6 @@ class ConditionalInference():
             self,
             trigger_ids,
             single_trigger_likelihoods,
-            single_trigger_likelihoods_with_cache,
             single_trigger_priors,
             single_trigger_results,
             n_posterior,
@@ -161,7 +157,6 @@ class ConditionalInference():
         ):
         self.trigger_ids = trigger_ids
         self.single_trigger_likelihoods = single_trigger_likelihoods
-        self.single_trigger_likelihoods_with_cache = single_trigger_likelihoods_with_cache
         self.single_trigger_priors = single_trigger_priors
         self.single_trigger_results = single_trigger_results
         self.n_posterior = n_posterior
@@ -199,18 +194,18 @@ class ConditionalInference():
                     self.joint_priors[p+self.suffix(trigger_idx)].latex_label += self.suffix(trigger_idx)
 
     def sample_all_marginalized(self, theta):
-        # Evaluate likelihood_base once to generate the waveform
         theta_dict = {p: theta[p] for p in self.likelihood_parameter_keys}
 
         if self.waveform_cache:
+            # Evaluate likelihood_base once to generate the waveform for caching
             self.likelihood_base.parameters.update(theta_dict)
-            self.likelihood_base.log_likelihood_ratio()
+            self.likelihood_base.log_likelihood_ratio(use_cache=False)
 
         log_evidence = 0.
         posterior_to_add = {}
 
         for trigger_idx in self.trigger_ids[1:]:
-            conditioned_likelihood = self.single_trigger_likelihoods_with_cache[trigger_idx]
+            conditioned_likelihood = self.single_trigger_likelihoods[trigger_idx]
             conditioned_likelihood.parameters.update(theta_dict)
 
             if self.waveform_cache:
@@ -264,10 +259,18 @@ class ConditionalInference():
         if self.waveform_cache:
             logger.info("Using waveform caching")
  
+        sampled_parameters = copy.deepcopy(self.independent_parameters)
+        if self.likelihood_base.time_marginalization:
+            sampled_parameters.remove("geocent_time")
+        if self.likelihood_base.distance_marginalization:
+            sampled_parameters.remove("luminosity_distance")
+
         # FIXME Check if there is anything to sample. If there is none, use the special method
-        self.sample = self.sample_all_marginalized
-        # All parameters are marginalized. Parallelization does not worth the overhead and extra memory usage
-        logger.info("Using 1 CPU core only, despite --request-cpus was set to {}".format(self.n_cores))
+        if sampled_parameters == ["image_type"]:
+            self.sample = self.sample_all_marginalized
+            logger.info("All parameters can be explicitly marginalized over. Disabling stochastic sampling")
+            # All parameters are marginalized. Parallelization does not worth the overhead and extra memory usage
+            logger.info("Using 1 CPU core only, despite --request-cpus was set to {}".format(self.n_cores))
 
         for i in tqdm.tqdm(range(self.n_posterior)):
             log_ev, pos = self.sample(theta_to_evaluate.iloc[i])
