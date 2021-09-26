@@ -78,8 +78,15 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
 
     def initialize_single_trigger_inference_inputs(self):
         self.single_trigger_likelihoods = []
+        self.single_trigger_likelihoods_with_cache = []
         self.single_trigger_priors = []
         self.single_trigger_results = []
+
+        _disable_all_marginalization = {
+            "time_marginalization": False,
+            "distance_marginalization": False,
+            "phase_marginalization": False,
+        }
 
         for idx, (trigger_ini_file, data_dump_file, result_file, PE_program) in enumerate(zip(self.trigger_ini_files, self.data_dump_files, self.result_files, self.inference_software)):
             if PE_program == "bilby":
@@ -88,19 +95,21 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                         result_file,
                         data_dump_file,
                         trigger_ini_file,
+                        **_disable_all_marginalization,
                     )                
             elif PE_program == "parallel_bilby":
                 single_trigger_likelihood, priors, single_trigger_result = \
                     load_run_from_pbilby(
                         result_file,
                         data_dump_file,
+                        **_disable_all_marginalization,
                     )
             else:
                 raise ValueError("Cannot recognize/does not support the inference software {}".format(PE_program))
 
             single_trigger_likelihood.priors = priors
 
-            single_trigger_likelihood = SingleLikelihoodWithTransformableWaveformCache.from_likelihood(
+            single_trigger_likelihood_with_cache = SingleLikelihoodWithTransformableWaveformCache.from_likelihood(
                 single_trigger_likelihood,
                 time_marginalization=self.time_marginalization,
                 distance_marginalization=self.distance_marginalization,
@@ -108,19 +117,41 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             )
             if self.time_marginalization:
                 # Necessary to make time marginalization works
-                single_trigger_likelihood.parameters.update({
-                    "geocent_time": float(single_trigger_likelihood.interferometers.start_time)
+                single_trigger_likelihood_with_cache.parameters.update({
+                    "geocent_time": float(single_trigger_likelihood_with_cache.interferometers.start_time)
                 })
 
             self.single_trigger_likelihoods.append(single_trigger_likelihood)
+            self.single_trigger_likelihoods_with_cache.append(single_trigger_likelihood_with_cache)
             self.single_trigger_priors.append(priors)
             self.single_trigger_results.append(single_trigger_result)
 
+    def combine_runs(self, conditional_inference_results):
+        # FIXME Before combining we should check and see if the runs are 'compatible' -- having same priors, etc
+        combined_posterior_samples = pd.concat([r.posterior for r in conditional_inference_results])
+        combined_log_evidence = logsumexp([r.log_evidence for r in conditional_inference_results], b=self.trigger_combo_weight)
+        joint_priors = conditional_inference_results[0].priors
+
+        combined_result = bilby.core.result.Result(
+            outdir=self.outdir,
+            label="{label}_combined".format(label=self.label),
+            sampler="hanabi_rapid_analysis",
+            search_parameter_keys=[k for k in list(joint_priors.keys()) if type(joint_priors[k]) != bilby.core.prior.Constraint],
+            posterior=combined_posterior_samples,
+            log_evidence=combined_log_evidence,
+            priors=joint_priors
+        )
+
+        combined_result.save_to_file(outdir=self.outdir)
+
     def run_analysis(self):
+        conditional_inference_results = []
+
         for combo in self.trigger_combo:
             inference = ConditionalInference(
                 combo,
                 self.single_trigger_likelihoods,
+                self.single_trigger_likelihoods_with_cache,
                 self.single_trigger_priors,
                 self.single_trigger_results,
                 self.n_posterior,
@@ -139,13 +170,18 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 " ,".join([self.single_trigger_results[i].label for i in combo[1:]]),
                 self.single_trigger_results[combo[0]].label
             ))
-            inference.run()
+
+            conditional_inference_results.append(inference.run())
+
+        if len(self.trigger_combo) > 1:
+            self.combine_runs(conditional_inference_results)
 
 class ConditionalInference():
     def __init__(
             self,
             trigger_ids,
             single_trigger_likelihoods,
+            single_trigger_likelihoods_with_cache,
             single_trigger_priors,
             single_trigger_results,
             n_posterior,
@@ -160,6 +196,7 @@ class ConditionalInference():
         ):
         self.trigger_ids = trigger_ids
         self.single_trigger_likelihoods = single_trigger_likelihoods
+        self.single_trigger_likelihoods_with_cache = single_trigger_likelihoods_with_cache
         self.single_trigger_priors = single_trigger_priors
         self.single_trigger_results = single_trigger_results
         self.n_posterior = n_posterior
@@ -176,6 +213,7 @@ class ConditionalInference():
         self.suffix = suffix
 
         self.likelihood_base = self.single_trigger_likelihoods[self.trigger_ids[0]] # Condition on this trigger
+        self.likelihood_base_with_cache = self.single_trigger_likelihoods_with_cache[self.trigger_ids[0]]
         # NOTE This assumes that all the likelihood functions take the same input parameters
         self.likelihood_parameter_keys = \
             list(self.likelihood_base.priors.sample().keys())
@@ -195,6 +233,7 @@ class ConditionalInference():
                         self.joint_priors[p+self.suffix(trigger_idx)].latex_label[:-1] + "{sep_char}{{({n})}}$".format(sep_char=self.sep_char, n=trigger_idx+1)
                 else:
                     self.joint_priors[p+self.suffix(trigger_idx)].latex_label += self.suffix(trigger_idx)
+        self.joint_priors = bilby.core.prior.PriorDict(self.joint_priors)
 
     def sample_all_marginalized(self, theta):
         theta_dict = {p: theta[p] for p in self.likelihood_parameter_keys}
@@ -202,13 +241,13 @@ class ConditionalInference():
         if self.waveform_cache:
             # Evaluate likelihood_base once to generate the waveform for caching
             self.likelihood_base.parameters.update(theta_dict)
-            self.likelihood_base.log_likelihood_ratio(use_cache=False)
+            self.likelihood_base.log_likelihood_ratio()
 
         log_evidence = 0.
         posterior_to_add = {}
 
         for trigger_idx in self.trigger_ids[1:]:
-            conditioned_likelihood = self.single_trigger_likelihoods[trigger_idx]
+            conditioned_likelihood = self.single_trigger_likelihoods_with_cache[trigger_idx]
             conditioned_likelihood.parameters.update(theta_dict)
 
             if self.waveform_cache:
@@ -231,6 +270,7 @@ class ConditionalInference():
                 conditioned_likelihood.parameters.update({'image_type': image_type})
                 log_Ls.append(conditioned_likelihood.log_likelihood())
 
+            # All parameters are marginalized over except for image type
             log_priors = np.array(log_priors)
             log_Ls = np.array(log_Ls)
 
@@ -264,9 +304,9 @@ class ConditionalInference():
             logger.info("Using waveform caching")
  
         sampled_parameters = copy.deepcopy(self.independent_parameters)
-        if self.likelihood_base.time_marginalization:
+        if self.likelihood_base_with_cache.time_marginalization:
             sampled_parameters.remove("geocent_time")
-        if self.likelihood_base.distance_marginalization:
+        if self.likelihood_base_with_cache.distance_marginalization:
             sampled_parameters.remove("luminosity_distance")
 
         # FIXME Check if there is anything to sample. If there is none, use the special method
@@ -287,7 +327,8 @@ class ConditionalInference():
         # Generate equal-weighted posterior samples
         logger.info("Generating equal-weighted posterior samples. This may take a moment")
         logger.info("Using {} CPU core(s) for joint likelihood evaluation".format(self.n_cores))
-        log_priors = self.joint_priors.ln_prob(samples.to_dict(), axis=0)
+
+        log_priors = self.joint_priors.ln_prob(samples, axis=0)
 
         if self.waveform_cache:
             joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
@@ -295,7 +336,7 @@ class ConditionalInference():
             joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
 
         with MultiPool(self.n_cores) as pool:
-            log_Ls = pool.starmap(compute_log_likelihood_for_theta, [[joint_likelihood, samples.iloc[i], {'use_cache': self.waveform_cache}] for i in range(len(samples))])
+            log_Ls = pool.starmap(compute_log_likelihood_for_theta, [[joint_likelihood, samples.iloc[i]] for i in range(len(samples))])
 
         log_Ls = np.array(log_Ls)
         log_posterior = log_Ls + log_priors - log_joint_evidence
@@ -319,6 +360,8 @@ class ConditionalInference():
         )
 
         joint_result.save_to_file(outdir=self.outdir)
+
+        return joint_result
 
 def main():
     parser = create_rapid_analysis_parser(__prog__, __version__)

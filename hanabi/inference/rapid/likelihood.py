@@ -5,12 +5,14 @@ from ...lensing.waveform import morse_phase_from_image_type
 class SingleLikelihoodWithTransformableWaveformCache(GravitationalWaveTransient):
     @classmethod
     def from_likelihood(cls, likelihood, time_marginalization=False, distance_marginalization=False, distance_marginalization_lookup_table=None):
-        return cls(
+        lh = cls(
             likelihood.interferometers, likelihood.waveform_generator, time_marginalization=time_marginalization,
             distance_marginalization=distance_marginalization, phase_marginalization=False, priors=likelihood.priors,
             distance_marginalization_lookup_table=distance_marginalization_lookup_table, jitter_time=False,
             reference_frame=likelihood.reference_frame, time_reference=likelihood.time_reference,
         )
+        lh._cache = None
+        return lh
 
     def initialize_cache(self, waveform_cache, parameters):
         self._cache = waveform_cache
