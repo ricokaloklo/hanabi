@@ -17,7 +17,7 @@ class SingleLikelihoodWithTransformableWaveformCache(GravitationalWaveTransient)
         self._cache["waveform_parameters"] = {k:v for k,v in parameters.items() if not k.startswith("recalib_")}
 
     def log_likelihood_ratio(self, use_cache=True):
-        if use_cache:
+        if use_cache and self._cache is not None:
             self.transform_from_cache(self.parameters)
         return super(SingleLikelihoodWithTransformableWaveformCache, self).log_likelihood_ratio()
 

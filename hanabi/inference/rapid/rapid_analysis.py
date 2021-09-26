@@ -9,12 +9,15 @@ import bilby
 import bilby_pipe
 from scipy.special import logsumexp
 from schwimmbad import SerialPool, MultiPool
+from dynesty.utils import resample_equal
 
 from .parser import create_rapid_analysis_parser
 from .utils import load_run_from_bilby, load_run_from_pbilby
 from .utils import _dist_marg_lookup_table_filename_template
+from .utils import compute_log_likelihood_for_theta
 from .likelihood import SingleLikelihoodWithTransformableWaveformCache
 from ..utils import ParameterSuffix
+from ...lensing.likelihood import LensingJointLikelihood, LensingJointLikelihoodWithWaveformCache
 
 from ..utils import get_version_information
 __version__ = get_version_information()
@@ -253,6 +256,7 @@ class ConditionalInference():
         theta_to_evaluate = self.single_trigger_results[self.trigger_ids[0]].posterior.sample(self.n_posterior)
 
         log_Z_conditioned = []
+        samples = [] # Not necessarily from posterior dist
         joint_posterior_samples = []
 
         logger = logging.getLogger(__prog__)
@@ -275,11 +279,32 @@ class ConditionalInference():
         for i in tqdm.tqdm(range(self.n_posterior)):
             log_ev, pos = self.sample(theta_to_evaluate.iloc[i])
             log_Z_conditioned.append(log_ev)
-            joint_posterior_samples.append(pos)
+            samples.append(pos)
 
         log_joint_evidence = self.single_trigger_results[self.trigger_ids[0]].log_evidence + logsumexp(np.array(log_Z_conditioned)) - np.log(self.n_posterior)
-        joint_posterior_samples = pd.DataFrame(joint_posterior_samples)
-        joint_posterior_samples["log_conditional_evidence"] = log_Z_conditioned
+        samples = pd.DataFrame(samples)
+
+        # Generate equal-weighted posterior samples
+        logger.info("Generating equal-weighted posterior samples. This may take a moment")
+        logger.info("Using {} CPU core(s) for joint likelihood evaluation".format(self.n_cores))
+        log_priors = self.joint_priors.ln_prob(samples.to_dict(), axis=0)
+
+        if self.waveform_cache:
+            joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+        else:
+            joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+
+        with MultiPool(self.n_cores) as pool:
+            log_Ls = pool.starmap(compute_log_likelihood_for_theta, [[joint_likelihood, samples.iloc[i], {'use_cache': self.waveform_cache}] for i in range(len(samples))])
+
+        log_Ls = np.array(log_Ls)
+        log_posterior = log_Ls + log_priors - log_joint_evidence
+        equal_weighted_samples = resample_equal(samples.to_numpy(), np.exp(log_posterior))
+
+        joint_posterior_samples = pd.DataFrame(equal_weighted_samples, columns=list(samples.columns))
+        samples["log_conditional_evidence"] = log_Z_conditioned
+        samples["log_likelihood"] = log_Ls
+        samples["log_prior"] = log_priors
 
         # Save to file
         joint_result = bilby.core.result.Result(
@@ -288,6 +313,7 @@ class ConditionalInference():
             sampler="hanabi_rapid_analysis",
             search_parameter_keys=[k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint],
             posterior=joint_posterior_samples,
+            samples=samples,
             log_evidence=log_joint_evidence,
             priors=self.joint_priors
         )

@@ -120,4 +120,8 @@ def load_run_from_bilby(result_file, data_dump_file, trigger_ini_file, **kwargs)
 
     return likelihood, priors, result
 
+def compute_log_likelihood_for_theta(likelihood, theta, **kwargs):
+    likelihood.parameters.update(theta)
+    return likelihood.log_likelihood(**kwargs)
+
 setup_logger("hanabi_rapid_analysis")
