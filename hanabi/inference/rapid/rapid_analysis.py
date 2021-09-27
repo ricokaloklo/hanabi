@@ -14,7 +14,7 @@ from dynesty.utils import resample_equal
 from .parser import create_rapid_analysis_parser
 from .utils import load_run_from_bilby, load_run_from_pbilby
 from .utils import _dist_marg_lookup_table_filename_template
-from .utils import compute_log_likelihood_for_theta
+from .utils import compute_log_likelihood_for_theta, compute_log_joint_evidence_from_log_conditional_evidence, bootstrap_uncertainty
 from .likelihood import SingleLikelihoodWithTransformableWaveformCache
 from ..utils import ParameterSuffix
 from ...lensing.likelihood import LensingJointLikelihood, LensingJointLikelihoodWithWaveformCache
@@ -321,7 +321,9 @@ class ConditionalInference():
             log_Z_conditioned.append(log_ev)
             samples.append(pos)
 
-        log_joint_evidence = self.single_trigger_results[self.trigger_ids[0]].log_evidence + logsumexp(np.array(log_Z_conditioned)) - np.log(self.n_posterior)
+        log_Z_conditioned = np.array(log_Z_conditioned)
+        log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
+        log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
         samples = pd.DataFrame(samples)
 
         # Generate equal-weighted posterior samples
@@ -356,6 +358,7 @@ class ConditionalInference():
             posterior=joint_posterior_samples,
             samples=samples,
             log_evidence=log_joint_evidence,
+            log_evidence_err=log_joint_evidence_err,
             priors=self.joint_priors
         )
 

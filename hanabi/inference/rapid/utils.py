@@ -4,6 +4,7 @@ import bilby_pipe
 import inspect
 import pickle
 from importlib import import_module
+from scipy.special import logsumexp
 
 from bilby.gw.likelihood import GravitationalWaveTransient
 from ..joint_analysis import SingleTriggerDataAnalysisInput
@@ -123,5 +124,19 @@ def load_run_from_bilby(result_file, data_dump_file, trigger_ini_file, **kwargs)
 def compute_log_likelihood_for_theta(likelihood, theta):
     likelihood.parameters.update(theta)
     return likelihood.log_likelihood()
+
+def compute_log_joint_evidence_from_log_conditional_evidence(base_log_evidence, log_conditional_evidence):
+    return base_log_evidence + logsumexp(log_conditional_evidence) - np.log(len(log_conditional_evidence))
+
+def bootstrap_uncertainty(log_conditional_evidence, n_frac=0.5, n_resample=1000):   
+    bootstrapped_estimate = []
+    for i in range(n_resample):
+        log_ev = compute_log_joint_evidence_from_log_conditional_evidence(
+            0.,
+            np.random.choice(log_conditional_evidence, size=int(n_frac*len(log_conditional_evidence)), replace=True)
+        )
+        bootstrapped_estimate.append(log_ev)
+
+    return np.std(bootstrapped_estimate), np.array(bootstrapped_estimate)
 
 setup_logger("hanabi_rapid_analysis")
