@@ -23,6 +23,9 @@ from ..utils import get_version_information
 __version__ = get_version_information()
 __prog__ = "hanabi_rapid_analysis"
 
+def unwrap_sample_all_marginalized(cls, theta):
+    return cls.sample_all_marginalized(theta)
+
 class RapidAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
         # Naming arguments
@@ -291,6 +294,55 @@ class ConditionalInference():
 
         return log_evidence, posterior_to_add
 
+    def generate_posterior_samples(self, samples, weights):
+        theta_to_evaluate = samples[self.joint_parameter_keys]
+        log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
+
+        if self.waveform_cache:
+            joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+        else:
+            joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+
+        with MultiPool(self.n_cores) as pool:
+            log_Ls = pool.starmap(compute_log_likelihood_for_theta, [[joint_likelihood, theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))])
+
+        log_Ls = np.array(log_Ls)
+        log_posterior = log_Ls + log_priors - self.log_joint_evidence
+
+        equal_weighted_samples = resample_equal(theta_to_evaluate.to_numpy(), weights)
+
+        joint_posterior_samples = pd.DataFrame(equal_weighted_samples, columns=list(theta_to_evaluate.columns))
+        samples["log_likelihood"] = log_Ls
+        samples["log_prior"] = log_priors
+
+        return joint_posterior_samples
+
+    def resample_posterior_from_gmm(self, posterior_samples, n_resamples):
+        from sklearn.mixture import GaussianMixture
+
+        # Figure out the n_components to use base on the number of combinations of image types
+        image_type_keys = [k for k in list(posterior_samples.columns) if k.startswith("image_type")]
+        n_components = len(posterior_samples.drop_duplicates(image_type_keys))
+        gm = GaussianMixture(n_components=n_components).fit(posterior_samples.to_numpy())
+        predictions, _ = gm.sample(n_resamples)
+
+        predictions = pd.DataFrame(predictions, columns=list(posterior_samples.columns))
+        for k in image_type_keys:
+            # Make sure that it is an integer
+            predicted_img_type = predictions[k].astype(int).to_numpy()
+            for i in range(len(predicted_img_type)):
+                if predicted_img_type[i] < 1:
+                    predicted_img_type[i] = 1
+                elif predicted_img_type[i] > 3:
+                    predicted_img_type[i] = 3
+            predictions[k] = predicted_img_type
+        # Keep predictions that are allowed by priors
+        predictions = predictions[np.isfinite(self.joint_priors.ln_prob(predictions, axis=0))]
+
+        new_posterior_samples = self.generate_posterior_samples(predictions)
+
+        return new_posterior_samples
+
     def run(self):
         # FIXME Maybe make it deterministic instead?
         theta_to_evaluate = self.single_trigger_results[self.trigger_ids[0]].posterior.sample(self.n_posterior)
@@ -321,33 +373,23 @@ class ConditionalInference():
             log_Z_conditioned.append(log_ev)
             samples.append(pos)
 
-        log_Z_conditioned = np.array(log_Z_conditioned)
-        log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
-        log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
         samples = pd.DataFrame(samples)
-
+        self.joint_parameter_keys = list(samples.columns)
+        log_Z_conditioned = np.array(log_Z_conditioned)
+        samples["log_conditional_evidence"] = log_Z_conditioned
+        self.log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
+        self.log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
+    
         # Generate equal-weighted posterior samples
         logger.info("Generating equal-weighted posterior samples. This may take a moment")
         logger.info("Using {} CPU core(s) for joint likelihood evaluation".format(self.n_cores))
 
-        log_priors = self.joint_priors.ln_prob(samples, axis=0)
+        log_importance_weights = self.single_trigger_results[self.trigger_ids[0]].log_evidence + log_Z_conditioned - logsumexp(self.single_trigger_results[self.trigger_ids[0]].log_evidence + log_Z_conditioned)
+        joint_posterior_samples = self.generate_posterior_samples(samples, np.exp(log_importance_weights))
 
-        if self.waveform_cache:
-            joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
-        else:
-            joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
-
-        with MultiPool(self.n_cores) as pool:
-            log_Ls = pool.starmap(compute_log_likelihood_for_theta, [[joint_likelihood, samples.iloc[i]] for i in range(len(samples))])
-
-        log_Ls = np.array(log_Ls)
-        log_posterior = log_Ls + log_priors - log_joint_evidence
-        equal_weighted_samples = resample_equal(samples.to_numpy(), np.exp(log_posterior))
-
-        joint_posterior_samples = pd.DataFrame(equal_weighted_samples, columns=list(samples.columns))
-        samples["log_conditional_evidence"] = log_Z_conditioned
-        samples["log_likelihood"] = log_Ls
-        samples["log_prior"] = log_priors
+        # FIXME Figure out how to choose n_resample
+        #new_posterior_samples = self.resample_posterior_from_gmm(joint_posterior_samples, 10000)
+        #joint_posterior_samples = pd.concat([joint_posterior_samples, new_posterior_samples])
 
         # Save to file
         joint_result = bilby.core.result.Result(
@@ -357,8 +399,8 @@ class ConditionalInference():
             search_parameter_keys=[k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint],
             posterior=joint_posterior_samples,
             samples=samples,
-            log_evidence=log_joint_evidence,
-            log_evidence_err=log_joint_evidence_err,
+            log_evidence=self.log_joint_evidence,
+            log_evidence_err=self.log_joint_evidence_err,
             priors=self.joint_priors
         )
 
