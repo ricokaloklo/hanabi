@@ -11,6 +11,7 @@ from scipy.special import logsumexp
 from schwimmbad import SerialPool, MultiPool
 from dynesty.utils import resample_equal
 
+from .sampler import sample_time_dist_marginalized
 from .parser import create_rapid_analysis_parser
 from .utils import load_run_from_bilby, load_run_from_pbilby
 from .utils import _dist_marg_lookup_table_filename_template
@@ -22,9 +23,6 @@ from ...lensing.likelihood import LensingJointLikelihood, LensingJointLikelihood
 from ..utils import get_version_information
 __version__ = get_version_information()
 __prog__ = "hanabi_rapid_analysis"
-
-def unwrap_sample_all_marginalized(cls, theta):
-    return cls.sample_all_marginalized(theta)
 
 class RapidAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
@@ -366,12 +364,37 @@ class ConditionalInference():
             self.sample = self.sample_all_marginalized
             logger.info("All parameters can be explicitly marginalized over. Disabling stochastic sampling")
             # All parameters are marginalized. Parallelization does not worth the overhead and extra memory usage
-            logger.info("Using 1 CPU core only, despite --request-cpus was set to {}".format(self.n_cores))
+            logger.info("Using {} CPU core(s) for rapid sampling".format(self.n_cores))
 
+            with MultiPool(self.n_cores) as pool:
+                outputs = pool.starmap(
+                    sample_time_dist_marginalized,
+                    [[
+                        theta_to_evaluate.iloc[i],
+                        self.trigger_ids,
+                        self.suffix,
+                        self.likelihood_parameter_keys,
+                        self.independent_parameters,
+                        self.lensing_prior_dict,
+                        self.likelihood_base,
+                        self.single_trigger_likelihoods_with_cache,
+                        self.waveform_cache,
+                    ] for i in range(self.n_posterior)]
+                )
+
+            for i in range(len(outputs)):
+                log_Z_conditioned.append(outputs[i][0])
+                samples.append(outputs[i][1])
+            logger.info("Rapid sampling completed")
+        else:
+            raise NotImplementedError("General sampling not implemented yet")
+
+        """
         for i in tqdm.tqdm(range(self.n_posterior)):
             log_ev, pos = self.sample(theta_to_evaluate.iloc[i])
             log_Z_conditioned.append(log_ev)
             samples.append(pos)
+        """
 
         samples = pd.DataFrame(samples)
         self.joint_parameter_keys = list(samples.columns)
