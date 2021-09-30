@@ -24,6 +24,15 @@ from ..utils import get_version_information
 __version__ = get_version_information()
 __prog__ = "hanabi_rapid_analysis"
 
+def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
+    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
+    log_prior = bilby_prior.ln_prob(theta_dict)
+    if not np.isfinite(log_prior):
+        return -np.inf
+    else:
+        bilby_likelihood.parameters.update(theta_dict)
+        return bilby_likelihood.log_likelihood() + log_prior
+
 class RapidAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
         # Naming arguments
@@ -263,23 +272,25 @@ class ConditionalInference():
         samples["log_prior"] = log_priors
 
         # Number of walkers in the ensemble
-        n_walkers = kwargs.get("nwalkers", 25)
-        p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:n_walkers][self.joint_search_parameter_keys]
+        nwalkers = kwargs.get("nwalkers", 100)
+        iterations = kwargs.get("iterations", 25000)
+        ndim = len(self.joint_search_parameter_keys)
+        p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:nwalkers][self.joint_search_parameter_keys]
 
-        logger.info("Launching MCMC for posterior samples")
+        logger.info("Launching MCMC for posterior samples")        
+        import emcee
         
-        emcee_result = bilby.run_sampler(
-            likelihood=joint_likelihood,
-            priors=self.joint_priors,
-            sampler="emcee",
-            outdir=self.outdir,
-            label="{label}_emcee".format(label=self.label),
-            pos0=p0.to_numpy(),
-            n_threads=self.n_cores,
-            **kwargs,
-        )
+        with MultiPool(self.n_cores) as pool:
+            mcmc_sampler = emcee.EnsembleSampler(nwalkers, ndim, lnpostfn, pool=pool, args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys])
+            mcmc_sampler.run_mcmc(p0.to_numpy(), iterations)
 
-        return emcee_result.posterior    
+        logger.info("MCMC completed") 
+
+        posterior_samples = mcmc_sampler.chain[:, :, :].reshape((-1, ndim))
+        posterior_samples = pd.DataFrame(posterior_samples, columns=self.joint_search_parameter_keys)
+
+        return posterior_samples
+        
 
     def run(self):
         # FIXME Maybe make it deterministic instead?
@@ -339,7 +350,7 @@ class ConditionalInference():
         logger.info("Generating joint posterior samples using MCMC. This may take a moment")
 
         # Launch a quick MCMC run to generate joint posterior samples
-        joint_posterior_samples = self.generate_posterior_samples(samples, nsteps=1000, nwalkers=100)
+        joint_posterior_samples = self.generate_posterior_samples(samples, iterations=1000, nwalkers=50, nburn=100)
 
         # Save to file
         joint_result = bilby.core.result.Result(
