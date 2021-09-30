@@ -213,6 +213,9 @@ class ConditionalInference():
             suffix = ParameterSuffix(self.sep_char)
         self.suffix = suffix
 
+        # Modify the label to record which trigger the inference is conditioned on
+        self.label = "{label}_conditioned_on_{base_label}".format(label=self.label, base_label=self.single_trigger_results[self.trigger_ids[0]].label)
+
         self.likelihood_base = self.single_trigger_likelihoods[self.trigger_ids[0]] # Condition on this trigger
         self.likelihood_base_with_cache = self.single_trigger_likelihoods_with_cache[self.trigger_ids[0]]
         # NOTE This assumes that all the likelihood functions take the same input parameters
@@ -236,63 +239,10 @@ class ConditionalInference():
                     self.joint_priors[p+self.suffix(trigger_idx)].latex_label += self.suffix(trigger_idx)
         self.joint_priors = bilby.core.prior.PriorDict(self.joint_priors)
 
-    def sample_all_marginalized(self, theta):
-        theta_dict = {p: theta[p] for p in self.likelihood_parameter_keys}
+        self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
 
-        if self.waveform_cache:
-            # Evaluate likelihood_base once to generate the waveform for caching
-            self.likelihood_base.parameters.update(theta_dict)
-            self.likelihood_base.log_likelihood_ratio()
-
-        log_evidence = 0.
-        posterior_to_add = {}
-
-        for trigger_idx in self.trigger_ids[1:]:
-            conditioned_likelihood = self.single_trigger_likelihoods_with_cache[trigger_idx]
-            conditioned_likelihood.parameters.update(theta_dict)
-
-            if self.waveform_cache:
-                # Assign waveform cache (so that we do not need to re-evaluate waveform)
-                conditioned_likelihood.initialize_cache(self.likelihood_base.waveform_generator._cache, theta_dict)
-
-            conditioned_likelihood.parameters.update({
-                "geocent_time": float(conditioned_likelihood.interferometers.start_time)
-            })
-
-            # For each image type, compute the logL
-            image_types = [1.0, 2.0, 3.0]
-            log_priors = []
-            log_Ls = []            
-
-            for image_type in image_types:
-                log_priors.append(
-                    self.lensing_prior_dict["image_type"+self.suffix(trigger_idx)].ln_prob(image_type)
-                )
-                conditioned_likelihood.parameters.update({'image_type': image_type})
-                log_Ls.append(conditioned_likelihood.log_likelihood())
-
-            # All parameters are marginalized over except for image type
-            log_priors = np.array(log_priors)
-            log_Ls = np.array(log_Ls)
-
-            log_evidence += logsumexp(log_Ls, b=np.exp(log_priors))
-
-            # Draw one posterior sample for each image type, weighted by log posterior
-            drawn_image_type = np.random.choice(image_types, p=np.exp(log_Ls + log_priors - log_evidence))
-            conditioned_likelihood.parameters.update({'image_type': drawn_image_type})
-            drawn_sample = conditioned_likelihood.generate_posterior_sample_from_marginalized_likelihood()
-
-            # Rename independent parameters
-            for k in self.independent_parameters:
-                drawn_sample[k+self.suffix(trigger_idx)] = drawn_sample.pop(k)
-            posterior_to_add.update(drawn_sample)
-
-        for k in self.independent_parameters:
-            posterior_to_add[k+self.suffix(self.trigger_ids[0])] = theta_dict[k] 
-
-        return log_evidence, posterior_to_add
-
-    def generate_posterior_samples(self, samples, weights):
+    def generate_posterior_samples(self, samples, **kwargs):
+        # Compute the log posterior to choose a better MCMC starting point
         theta_to_evaluate = samples[self.joint_parameter_keys]
         log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
 
@@ -301,45 +251,35 @@ class ConditionalInference():
         else:
             joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
 
+        logger = logging.getLogger(__prog__)
+        logger.info("Using {} CPU core(s) for likelihood evaluation".format(self.n_cores))
         with MultiPool(self.n_cores) as pool:
-            log_Ls = pool.starmap(compute_log_likelihood_for_theta, [[joint_likelihood, theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))])
+            log_Ls = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[joint_likelihood, theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))]))
 
         log_Ls = np.array(log_Ls)
         log_posterior = log_Ls + log_priors - self.log_joint_evidence
-
-        equal_weighted_samples = resample_equal(theta_to_evaluate.to_numpy(), weights)
-
-        joint_posterior_samples = pd.DataFrame(equal_weighted_samples, columns=list(theta_to_evaluate.columns))
+        samples["log_posterior"] = log_posterior
         samples["log_likelihood"] = log_Ls
         samples["log_prior"] = log_priors
 
-        return joint_posterior_samples
+        # Number of walkers in the ensemble
+        n_walkers = kwargs.get("nwalkers", 25)
+        p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:n_walkers][self.joint_search_parameter_keys]
 
-    def resample_posterior_from_gmm(self, posterior_samples, n_resamples):
-        from sklearn.mixture import GaussianMixture
+        logger.info("Launching MCMC for posterior samples")
+        
+        emcee_result = bilby.run_sampler(
+            likelihood=joint_likelihood,
+            priors=self.joint_priors,
+            sampler="emcee",
+            outdir=self.outdir,
+            label="{label}_emcee".format(label=self.label),
+            pos0=p0.to_numpy(),
+            n_threads=self.n_cores,
+            **kwargs,
+        )
 
-        # Figure out the n_components to use base on the number of combinations of image types
-        image_type_keys = [k for k in list(posterior_samples.columns) if k.startswith("image_type")]
-        n_components = len(posterior_samples.drop_duplicates(image_type_keys))
-        gm = GaussianMixture(n_components=n_components).fit(posterior_samples.to_numpy())
-        predictions, _ = gm.sample(n_resamples)
-
-        predictions = pd.DataFrame(predictions, columns=list(posterior_samples.columns))
-        for k in image_type_keys:
-            # Make sure that it is an integer
-            predicted_img_type = predictions[k].astype(int).to_numpy()
-            for i in range(len(predicted_img_type)):
-                if predicted_img_type[i] < 1:
-                    predicted_img_type[i] = 1
-                elif predicted_img_type[i] > 3:
-                    predicted_img_type[i] = 3
-            predictions[k] = predicted_img_type
-        # Keep predictions that are allowed by priors
-        predictions = predictions[np.isfinite(self.joint_priors.ln_prob(predictions, axis=0))]
-
-        new_posterior_samples = self.generate_posterior_samples(predictions)
-
-        return new_posterior_samples
+        return emcee_result.posterior    
 
     def run(self):
         # FIXME Maybe make it deterministic instead?
@@ -361,15 +301,14 @@ class ConditionalInference():
 
         # FIXME Check if there is anything to sample. If there is none, use the special method
         if sampled_parameters == ["image_type"]:
-            self.sample = self.sample_all_marginalized
             logger.info("All parameters can be explicitly marginalized over. Disabling stochastic sampling")
-            # All parameters are marginalized. Parallelization does not worth the overhead and extra memory usage
+            # Embarrassingly parallelized
             logger.info("Using {} CPU core(s) for rapid sampling".format(self.n_cores))
 
             with MultiPool(self.n_cores) as pool:
                 outputs = pool.starmap(
                     sample_time_dist_marginalized,
-                    [[
+                    tqdm.tqdm([[
                         theta_to_evaluate.iloc[i],
                         self.trigger_ids,
                         self.suffix,
@@ -379,7 +318,7 @@ class ConditionalInference():
                         self.likelihood_base,
                         self.single_trigger_likelihoods_with_cache,
                         self.waveform_cache,
-                    ] for i in range(self.n_posterior)]
+                    ] for i in range(self.n_posterior)])
                 )
 
             for i in range(len(outputs)):
@@ -389,13 +328,6 @@ class ConditionalInference():
         else:
             raise NotImplementedError("General sampling not implemented yet")
 
-        """
-        for i in tqdm.tqdm(range(self.n_posterior)):
-            log_ev, pos = self.sample(theta_to_evaluate.iloc[i])
-            log_Z_conditioned.append(log_ev)
-            samples.append(pos)
-        """
-
         samples = pd.DataFrame(samples)
         self.joint_parameter_keys = list(samples.columns)
         log_Z_conditioned = np.array(log_Z_conditioned)
@@ -404,22 +336,17 @@ class ConditionalInference():
         self.log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
     
         # Generate equal-weighted posterior samples
-        logger.info("Generating equal-weighted posterior samples. This may take a moment")
-        logger.info("Using {} CPU core(s) for joint likelihood evaluation".format(self.n_cores))
+        logger.info("Generating joint posterior samples using MCMC. This may take a moment")
 
-        log_importance_weights = self.single_trigger_results[self.trigger_ids[0]].log_evidence + log_Z_conditioned - logsumexp(self.single_trigger_results[self.trigger_ids[0]].log_evidence + log_Z_conditioned)
-        joint_posterior_samples = self.generate_posterior_samples(samples, np.exp(log_importance_weights))
-
-        # FIXME Figure out how to choose n_resample
-        #new_posterior_samples = self.resample_posterior_from_gmm(joint_posterior_samples, 10000)
-        #joint_posterior_samples = pd.concat([joint_posterior_samples, new_posterior_samples])
+        # Launch a quick MCMC run to generate joint posterior samples
+        joint_posterior_samples = self.generate_posterior_samples(samples, nsteps=1000, nwalkers=100)
 
         # Save to file
         joint_result = bilby.core.result.Result(
             outdir=self.outdir,
-            label="{label}_conditioned_on_{base_label}".format(label=self.label, base_label=self.single_trigger_results[self.trigger_ids[0]].label),
+            label=self.label,
             sampler="hanabi_rapid_analysis",
-            search_parameter_keys=[k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint],
+            search_parameter_keys=self.joint_search_parameter_keys,
             posterior=joint_posterior_samples,
             samples=samples,
             log_evidence=self.log_joint_evidence,
