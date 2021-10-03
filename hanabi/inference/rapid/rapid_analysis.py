@@ -405,6 +405,8 @@ class ConditionalInference():
         logger.info("Generating joint posterior samples. This may take a moment")
         joint_posterior_samples = self.generate_posterior_samples(samples)
 
+        log_joint_noise_evidence = np.sum([r.log_noise_evidence for r in self.single_trigger_results])
+
         # Save to file
         joint_result = bilby.core.result.Result(
             outdir=self.outdir,
@@ -415,6 +417,7 @@ class ConditionalInference():
             samples=samples,
             log_evidence=self.log_joint_evidence,
             log_evidence_err=self.log_joint_evidence_err,
+            log_noise_evidence=log_joint_noise_evidence,
             priors=self.joint_priors
         )
 
