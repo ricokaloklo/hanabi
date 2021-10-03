@@ -418,6 +418,7 @@ class ConditionalInference():
             log_evidence=self.log_joint_evidence,
             log_evidence_err=self.log_joint_evidence_err,
             log_noise_evidence=log_joint_noise_evidence,
+            log_bayes_factor=self.log_joint_evidence-log_joint_noise_evidence,
             priors=self.joint_priors
         )
 
