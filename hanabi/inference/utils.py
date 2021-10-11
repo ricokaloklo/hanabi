@@ -8,7 +8,6 @@ import pickle
 from importlib import import_module
 
 from bilby.gw.likelihood import GravitationalWaveTransient
-from .joint_analysis import SingleTriggerDataAnalysisInput
 from .._version import __version__
 
 class ParameterSuffix(object):
@@ -230,6 +229,7 @@ def load_run_from_bilby(data_dump_file, trigger_ini_file, result_file=None, **kw
     for k, v in kwargs.items():
         setattr(args, k, v)
 
+    from hanabi.inference.joint_analysis import SingleTriggerDataAnalysisInput
     single_trigger_analysis = SingleTriggerDataAnalysisInput(args, unknown_args)
     likelihood, priors = single_trigger_analysis.get_likelihood_and_priors()
 
