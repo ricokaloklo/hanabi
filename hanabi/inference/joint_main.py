@@ -106,7 +106,6 @@ def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
 
         turn_off_forbidden_option(main_input, "submit", __prog__)
         turn_off_forbidden_option(args, "submit", __prog__)
-        turn_off_forbidden_option(args, "distance_marginalization", __prog__)
         turn_off_forbidden_option(args, "phase_marginalization", __prog__)
         turn_off_forbidden_option(args, "time_marginalization", __prog__)
 

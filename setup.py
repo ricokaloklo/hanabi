@@ -89,6 +89,7 @@ setuptools.setup(
         "gwpopulation",
         "parallel_bilby>=0.1.5",
         "mpi4py",
+        "configargparse==1.4",
     ],
     classifiers=[
         "Programming Language :: Python :: 3.6",
