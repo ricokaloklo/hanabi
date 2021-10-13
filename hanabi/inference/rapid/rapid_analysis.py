@@ -13,12 +13,11 @@ from dynesty.utils import resample_equal
 
 from .sampler import sample_time_dist_marginalized
 from .parser import create_rapid_analysis_parser
-from .utils import load_run_from_bilby, load_run_from_pbilby
 from .utils import _dist_marg_lookup_table_filename_template
 from .utils import compute_log_likelihood_for_theta, compute_log_joint_evidence_from_log_conditional_evidence, bootstrap_uncertainty
 from .utils import simulate_run_with_image_type_sampled
 from .likelihood import SingleLikelihoodWithTransformableWaveformCache
-from ..utils import ParameterSuffix
+from ..utils import ParameterSuffix, load_run_from_bilby, load_run_from_pbilby
 from ...lensing.likelihood import LensingJointLikelihood, LensingJointLikelihoodWithWaveformCache
 
 from ..utils import get_version_information
@@ -95,16 +94,16 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             if PE_program == "bilby":
                 single_trigger_likelihood, priors, single_trigger_result = \
                     load_run_from_bilby(
-                        result_file,
                         data_dump_file,
                         trigger_ini_file,
+                        result_file=result_file,
                         **_disable_all_marginalization,
                     )                
             elif PE_program == "parallel_bilby":
                 single_trigger_likelihood, priors, single_trigger_result = \
                     load_run_from_pbilby(
-                        result_file,
                         data_dump_file,
+                        result_file=result_file,
                         **_disable_all_marginalization,
                     )
             else:
