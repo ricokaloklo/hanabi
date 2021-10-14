@@ -142,7 +142,10 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
 
     def combine_runs(self, conditional_inference_results):
         # FIXME Before combining we should check and see if the runs are 'compatible' -- having same priors, etc
-        combined_posterior_samples = pd.concat([r.posterior for r in conditional_inference_results])
+        if self.generate_posterior_samples:
+            combined_posterior_samples = pd.concat([r.posterior for r in conditional_inference_results])
+        else:
+            combined_posterior_samples = None
         combined_log_evidence = logsumexp([r.log_evidence for r in conditional_inference_results], b=self.trigger_combo_weight)
         joint_priors = conditional_inference_results[0].priors
 
@@ -207,6 +210,7 @@ class ConditionalInference():
             outdir="outdir",
             label="label",
             waveform_cache=True,
+            generate_posterior_samples=False,
         ):
         self.trigger_ids = trigger_ids
         self.single_trigger_likelihoods = single_trigger_likelihoods
@@ -220,6 +224,7 @@ class ConditionalInference():
         self.outdir = outdir
         self.label = label
         self.waveform_cache = waveform_cache
+        self.generate_posterior_samples = generate_posterior_samples
 
         self.sep_char = sep_char
         if suffix is None:
@@ -295,6 +300,10 @@ class ConditionalInference():
         if self.likelihood_base_with_cache.distance_marginalization:
             sampled_parameters.remove("luminosity_distance")
 
+        # Remove all calibration parameters
+        for p in [k for k in sampled_parameters if k.startswith("recalib")]:
+            sampled_parameters.remove(p)
+
         # FIXME Check if there is anything to sample. If there is none, use the special method
         if sampled_parameters == ["image_type"]:
             logger.info("All parameters can be explicitly marginalized over. Disabling stochastic sampling")
@@ -331,9 +340,12 @@ class ConditionalInference():
         self.log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
         self.log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
     
-        # Generate equal-weighted posterior samples
-        logger.info("Generating joint posterior samples. This may take a moment")
-        joint_posterior_samples = self.generate_posterior_samples(samples)
+        if self.generate_posterior_samples:
+            # Generate equal-weighted posterior samples
+            logger.info("Generating joint posterior samples. This may take a moment")
+            joint_posterior_samples = self.generate_posterior_samples(samples)
+        else:
+            joint_posterior_samples = None
 
         log_joint_noise_evidence = np.sum([r.log_noise_evidence for r in self.single_trigger_results])
 

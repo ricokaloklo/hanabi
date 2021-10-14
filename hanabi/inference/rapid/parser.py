@@ -142,5 +142,11 @@ def create_rapid_analysis_parser(prog, prog_version):
         action=StoreBoolean,
         help="Enable waveform caching",
     )
+    analysis_setting_parser.add(
+        "--generate-posterior-samples",
+        default=False,
+        action=StoreBoolean,
+        help="Generate joint posterior samples using rejection sampling"
+    )
 
     return parser
