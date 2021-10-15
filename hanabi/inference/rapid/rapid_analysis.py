@@ -97,6 +97,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                         data_dump_file,
                         trigger_ini_file,
                         result_file=result_file,
+                        calibration_model=None,
                         **_disable_all_marginalization,
                     )                
             elif PE_program == "parallel_bilby":
@@ -104,12 +105,17 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                     load_run_from_pbilby(
                         data_dump_file,
                         result_file=result_file,
+                        calibration_model=None,
                         **_disable_all_marginalization,
                     )
             else:
                 raise ValueError("Cannot recognize/does not support the inference software {}".format(PE_program))
 
-            single_trigger_likelihood.priors = priors
+
+            # FIXME Compatibility issue
+            for ifo in single_trigger_likelihood.interferometers:
+                ifo.calibration_model = bilby.gw.detector.calibration.Recalibrate()
+                ifo.strain_data.notch_list = []
 
             single_trigger_likelihood_with_cache = SingleLikelihoodWithTransformableWaveformCache.from_likelihood(
                 single_trigger_likelihood,
@@ -238,7 +244,7 @@ class ConditionalInference():
         self.likelihood_base_with_cache = self.single_trigger_likelihoods_with_cache[self.trigger_ids[0]]
         # NOTE This assumes that all the likelihood functions take the same input parameters
         self.likelihood_parameter_keys = \
-            list(self.likelihood_base.priors.sample().keys())
+            [p for p in list(self.likelihood_base.priors.sample().keys()) if not p.startswith("recalib")]
         self.independent_parameters = [p for p in self.likelihood_parameter_keys if p not in self.common_parameters]
 
         # Reconstruct the effective joint prior
@@ -246,6 +252,9 @@ class ConditionalInference():
         self.joint_priors = {k: self.single_trigger_priors[self.trigger_ids[0]][k] for k in self.common_parameters}
         for trigger_idx in self.trigger_ids:
             for p in self.independent_parameters:
+                if p.startswith("recalib"):
+                    # Ignore calibration uncertainty
+                    continue
                 self.joint_priors[p+self.suffix(trigger_idx)] = copy.deepcopy(self.single_trigger_priors[trigger_idx][p])
                 # Rename the parameter
                 self.joint_priors[p+self.suffix(trigger_idx)].name += self.suffix(trigger_idx)
@@ -300,16 +309,12 @@ class ConditionalInference():
         if self.likelihood_base_with_cache.distance_marginalization:
             sampled_parameters.remove("luminosity_distance")
 
-        # Remove all calibration parameters
-        for p in [k for k in sampled_parameters if k.startswith("recalib")]:
-            sampled_parameters.remove(p)
-
         # FIXME Check if there is anything to sample. If there is none, use the special method
         if sampled_parameters == ["image_type"]:
             logger.info("All parameters can be explicitly marginalized over. Disabling stochastic sampling")
             # Embarrassingly parallelized
             logger.info("Using {} CPU core(s) for rapid sampling".format(self.n_cores))
-
+            
             with MultiPool(self.n_cores) as pool:
                 outputs = pool.starmap(
                     sample_time_dist_marginalized,
