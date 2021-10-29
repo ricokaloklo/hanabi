@@ -57,7 +57,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             self.trigger_combo = [np.roll(self.trigger_ids, -s) for s in range(self.n_triggers)]
             self.trigger_combo_weight = np.ones(self.n_triggers, dtype=float)/self.n_triggers
         else:
-            self.trigger_combo = self.trigger_ids
+            self.trigger_combo = [self.trigger_ids]
             self.trigger_combo_weight = np.array([1.])
 
         # Load and reconstruct likelihood for evaluation
@@ -186,6 +186,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 label=self.label,
                 n_cores=self.n_cores,
                 waveform_cache=self.waveform_cache,
+                generate_posterior_samples=self.generate_posterior_samples,
             )
 
             logger = logging.getLogger(__prog__)
@@ -268,28 +269,52 @@ class ConditionalInference():
 
         self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
 
-    def generate_posterior_samples(self, samples):
-        # Compute the log normalized conditional posterior
-        log_priors = []
-        log_Ls = []
 
-        for trigger_idx in self.trigger_ids[1:]:
-            theta_to_evaluate = samples[[p for p in self.likelihood_parameter_keys if p in self.common_parameters]].copy()
-            for p in self.independent_parameters:
-                theta_to_evaluate[p] = samples[p+self.suffix(trigger_idx)]
-            
-            log_prior = self.single_trigger_priors[trigger_idx].ln_prob(theta_to_evaluate, axis=0)
-            with MultiPool(self.n_cores) as pool:
-                log_L = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[self.single_trigger_likelihoods[trigger_idx], theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))]))
+    def generate_joint_posterior_samples(self, samples, n_mcmc=5000):
+        """
+            The basic idea of this MCMC (actually Metropolis-Hastings) algorithm is that we first randomly draw one 
+            row (or equivalently an index) [prior: 1/N_row] from the base/0th trigger
 
-            log_priors.append(log_prior)
-            log_Ls.append(log_L)
+            Conditioned on this row, draw a sample of (theta_ind^2)
+            Accept this draw if a \def p(x_new)/p(x_old) >= 1
+            Otherwise accept this draw with a probabiltiy of a
+        """
+        # Initialize the joint likelihood
+        joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
 
-        log_priors = np.sum(np.array(log_priors), axis=0)
-        log_Ls = np.sum(np.array(log_Ls), axis=0)
-        log_wts = log_Ls + log_priors - samples["log_conditional_evidence"]
+        # Initialize the chain
+        mcmc_chain = []
+        log_posteriors = []
 
-        return bilby.core.result.rejection_sample(samples, np.exp(log_wts))
+        def propose_sample():
+            proposed_idx = np.random.randint(0, len(samples))
+            proposed_sample = samples.iloc[proposed_idx].to_dict()
+            joint_likelihood.parameters.update(proposed_sample)
+            proposed_sample_log_L = joint_likelihood.log_likelihood()
+            proposed_sample_log_prior = self.joint_priors.ln_prob(proposed_sample)
+
+            return proposed_idx, proposed_sample, proposed_sample_log_L, proposed_sample_log_prior
+
+        # Loop until n_mcmc of samples are generated
+        for _ in tqdm.tqdm(range(n_mcmc)):
+            p_idx, p_sample, p_log_L, p_log_prior = propose_sample()
+            p_log_posterior = p_log_L+p_log_prior
+
+            # Metropolis algorithm
+            if len(mcmc_chain) == 0:
+                mcmc_chain.append(p_idx)
+                log_posteriors.append(p_log_posterior)
+                continue
+
+            acceptance_prob = np.amin([1, np.exp(p_log_posterior - log_posteriors[-1])])
+            if np.random.random() <= acceptance_prob:
+                # Accept
+                mcmc_chain.append(p_idx)
+            else:
+                # Reject
+                mcmc_chain.append(mcmc_chain[-1])
+
+        return mcmc_chain
 
     def run(self):
         # FIXME Maybe make it deterministic instead?
@@ -341,18 +366,18 @@ class ConditionalInference():
         samples = pd.DataFrame(samples)
         self.joint_parameter_keys = list(samples.columns)
         log_Z_conditioned = np.array(log_Z_conditioned)
-        samples["log_conditional_evidence"] = log_Z_conditioned
         self.log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
         self.log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
     
         if self.generate_posterior_samples:
             # Generate equal-weighted posterior samples
             logger.info("Generating joint posterior samples. This may take a moment")
-            joint_posterior_samples = self.generate_posterior_samples(samples)
+            joint_posterior_samples = samples.iloc[self.generate_joint_posterior_samples(samples, n_mcmc=len(samples))]
         else:
             joint_posterior_samples = None
 
         log_joint_noise_evidence = np.sum([r.log_noise_evidence for r in self.single_trigger_results])
+        samples["log_conditional_evidence"] = log_Z_conditioned
 
         # Save to file
         joint_result = bilby.core.result.Result(
