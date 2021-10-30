@@ -24,6 +24,19 @@ from ..utils import get_version_information
 __version__ = get_version_information()
 __prog__ = "hanabi_rapid_analysis"
 
+def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
+    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
+    # NOTE The image_type parameters are *discrete*, need to apply transformation
+    for p in theta_dict.keys():
+        if p.startswith("image_type"):
+            theta_dict[p] = int(theta_dict[p])
+            
+    log_prior = bilby_prior.ln_prob(theta_dict)
+    if not np.isfinite(log_prior):
+        return -np.inf
+    else:
+        bilby_likelihood.parameters.update(theta_dict)
+        return bilby_likelihood.log_likelihood() + log_prior
 
 class RapidAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
@@ -269,6 +282,46 @@ class ConditionalInference():
 
         self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
 
+    def regenerate_joint_posterior_samples(self, samples, **kwargs):
+        # Compute the log posterior to choose a better MCMC starting point
+        theta_to_evaluate = samples[self.joint_parameter_keys]
+        log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
+
+        if self.waveform_cache:
+            joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+        else:
+            joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+
+        logger = logging.getLogger(__prog__)
+        logger.info("Using {} CPU core(s) for likelihood evaluation".format(self.n_cores))
+        with MultiPool(self.n_cores) as pool:
+            log_Ls = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[joint_likelihood, theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))]))
+
+        log_Ls = np.array(log_Ls)
+        log_posterior = log_Ls + log_priors - self.log_joint_evidence
+        samples["log_posterior"] = log_posterior
+        samples["log_likelihood"] = log_Ls
+        samples["log_prior"] = log_priors
+
+        # Number of walkers in the ensemble
+        nwalkers = kwargs.get("nwalkers", 100)
+        iterations = kwargs.get("iterations", 25000)
+        ndim = len(self.joint_search_parameter_keys)
+        p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:nwalkers][self.joint_search_parameter_keys]
+
+        logger.info("Launching MCMC for posterior samples")        
+        import emcee
+        
+        with MultiPool(self.n_cores) as pool:
+            mcmc_sampler = emcee.EnsembleSampler(nwalkers, ndim, lnpostfn, pool=pool, args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys])
+            mcmc_sampler.run_mcmc(p0.to_numpy(), iterations)
+
+        logger.info("MCMC completed") 
+
+        posterior_samples = mcmc_sampler.chain[:, :, :].reshape((-1, ndim))
+        posterior_samples = pd.DataFrame(posterior_samples, columns=self.joint_search_parameter_keys)
+
+        return posterior_samples
 
     def generate_joint_posterior_samples(self, samples, n_mcmc=5000):
         """
@@ -372,7 +425,8 @@ class ConditionalInference():
         if self.generate_posterior_samples:
             # Generate equal-weighted posterior samples
             logger.info("Generating joint posterior samples. This may take a moment")
-            joint_posterior_samples = samples.iloc[self.generate_joint_posterior_samples(samples, n_mcmc=len(samples))]
+            #joint_posterior_samples = samples.iloc[self.generate_joint_posterior_samples(samples, n_mcmc=len(samples))]
+            joint_posterior_samples = self.regenerate_joint_posterior_samples(samples)
         else:
             joint_posterior_samples = None
 
