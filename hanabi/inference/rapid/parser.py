@@ -142,11 +142,18 @@ def create_rapid_analysis_parser(prog, prog_version):
         action=StoreBoolean,
         help="Enable waveform caching",
     )
-    analysis_setting_parser.add(
+
+    posterior_generation_parser = parser.add_argument_group(title="Posterior sample generation setting arguments", description="Specify the settings for generating posterior samples")
+    posterior_generation_parser.add(
         "--generate-posterior-samples",
         default=False,
         action=StoreBoolean,
-        help="Generate joint posterior samples using rejection sampling"
+        help="Generate joint posterior samples using Markov Chain Monte Carlo method",
+    )
+    posterior_generation_parser.add(
+        "--mcmc-sampler-kwargs",
+        type=str,
+        help="Keyword arguments to be passed to zeus the MCMC sampler",
     )
 
     return parser

@@ -24,19 +24,32 @@ from ..utils import get_version_information
 __version__ = get_version_information()
 __prog__ = "hanabi_rapid_analysis"
 
-def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
+def lnpriorfn(x, bilby_prior, joint_search_parameter_keys):
     theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
     # NOTE The image_type parameters are *discrete*, need to apply transformation
     for p in theta_dict.keys():
         if p.startswith("image_type"):
-            theta_dict[p] = int(theta_dict[p])
+            theta_dict[p] = round(theta_dict[p])
             
     log_prior = bilby_prior.ln_prob(theta_dict)
+    return log_prior
+
+def lnlikefn(x, bilby_likelihood, joint_search_parameter_keys):
+    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
+    # NOTE The image_type parameters are *discrete*, need to apply transformation
+    for p in theta_dict.keys():
+        if p.startswith("image_type"):
+            theta_dict[p] = round(theta_dict[p])
+
+    bilby_likelihood.parameters.update(theta_dict)
+    return bilby_likelihood.log_likelihood()
+
+def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
+    log_prior = lnpriorfn(x, bilby_prior, joint_search_parameter_keys)
     if not np.isfinite(log_prior):
         return -np.inf
     else:
-        bilby_likelihood.parameters.update(theta_dict)
-        return bilby_likelihood.log_likelihood() + log_prior
+        return lnlikefn(x, bilby_likelihood, joint_search_parameter_keys) + log_prior
 
 class RapidAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
@@ -282,7 +295,7 @@ class ConditionalInference():
 
         self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
 
-    def regenerate_joint_posterior_samples(self, samples, **kwargs):
+    def generate_joint_posterior_samples(self, samples, **kwargs):
         # Compute the log posterior to choose a better MCMC starting point
         theta_to_evaluate = samples[self.joint_parameter_keys]
         log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
@@ -293,81 +306,76 @@ class ConditionalInference():
             joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
 
         logger = logging.getLogger(__prog__)
+
+        """
         logger.info("Using {} CPU core(s) for likelihood evaluation".format(self.n_cores))
         with MultiPool(self.n_cores) as pool:
             log_Ls = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[joint_likelihood, theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))]))
-
+        
         log_Ls = np.array(log_Ls)
         log_posterior = log_Ls + log_priors - self.log_joint_evidence
         samples["log_posterior"] = log_posterior
         samples["log_likelihood"] = log_Ls
         samples["log_prior"] = log_priors
+        """
 
         # Number of walkers in the ensemble
-        nwalkers = kwargs.get("nwalkers", 100)
-        iterations = kwargs.get("iterations", 25000)
+        nwalkers = kwargs.get("nwalkers", 80)
+        iterations = kwargs.get("iterations", 5000)
         ndim = len(self.joint_search_parameter_keys)
-        p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:nwalkers][self.joint_search_parameter_keys]
+        #ntemps = 8
+        #p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:nwalkers*ntemps][self.joint_search_parameter_keys]
+        #p0 = samples.sample(nwalkers*ntemps)[self.joint_search_parameter_keys]
+        #p0 = p0.to_numpy().reshape((ntemps, nwalkers, ndim))
+        p0 = samples.sample(nwalkers)[self.joint_search_parameter_keys].to_numpy()
 
-        logger.info("Launching MCMC for posterior samples")        
-        import emcee
-        
+        logger.info("Launching MCMC for posterior samples")
+        import zeus
+        #import emcee
+
         with MultiPool(self.n_cores) as pool:
-            mcmc_sampler = emcee.EnsembleSampler(nwalkers, ndim, lnpostfn, pool=pool, args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys])
-            mcmc_sampler.run_mcmc(p0.to_numpy(), iterations)
+            mcmc_sampler = zeus.EnsembleSampler(
+                nwalkers,
+                ndim,
+                lnpostfn,
+                pool=pool,
+                args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys],
+            )
+            mcmc_sampler.run_mcmc(p0, iterations)
 
-        logger.info("MCMC completed") 
+            """
+            mcmc_sampler = emcee.PTSampler(
+                ntemps,
+                nwalkers,
+                ndim,
+                lnlikefn,
+                lnpriorfn,
+                pool=pool,
+                loglargs=[joint_likelihood, self.joint_search_parameter_keys],
+                logpargs=[self.joint_priors, self.joint_search_parameter_keys],
+            )
+            mcmc_sampler.run_mcmc(p0, iterations)
+            """
+
+        logger.info("MCMC completed")
 
         posterior_samples = mcmc_sampler.chain[:, :, :].reshape((-1, ndim))
         posterior_samples = pd.DataFrame(posterior_samples, columns=self.joint_search_parameter_keys)
 
+        # Make sure that the image_type parameters are integers
+        for p in posterior_samples.columns:
+            if p.startswith("image_type"):
+                posterior_samples[p] = round(posterior_samples[p])
+
+        """
+        # Compute log L for diagnostics
+        logger.info("Using {} CPU core(s) for likelihood evaluation".format(self.n_cores))
+        with MultiPool(self.n_cores) as pool:
+            log_Ls = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[joint_likelihood, posterior_samples[self.joint_search_parameter_keys].iloc[i]] for i in range(len(posterior_samples))]))
+        log_Ls = np.array(log_Ls)
+        posterior_samples["log_likelihood"] = log_Ls
+        """
         return posterior_samples
-
-    def generate_joint_posterior_samples(self, samples, n_mcmc=5000):
-        """
-            The basic idea of this MCMC (actually Metropolis-Hastings) algorithm is that we first randomly draw one 
-            row (or equivalently an index) [prior: 1/N_row] from the base/0th trigger
-
-            Conditioned on this row, draw a sample of (theta_ind^2)
-            Accept this draw if a \def p(x_new)/p(x_old) >= 1
-            Otherwise accept this draw with a probabiltiy of a
-        """
-        # Initialize the joint likelihood
-        joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
-
-        # Initialize the chain
-        mcmc_chain = []
-        log_posteriors = []
-
-        def propose_sample():
-            proposed_idx = np.random.randint(0, len(samples))
-            proposed_sample = samples.iloc[proposed_idx].to_dict()
-            joint_likelihood.parameters.update(proposed_sample)
-            proposed_sample_log_L = joint_likelihood.log_likelihood()
-            proposed_sample_log_prior = self.joint_priors.ln_prob(proposed_sample)
-
-            return proposed_idx, proposed_sample, proposed_sample_log_L, proposed_sample_log_prior
-
-        # Loop until n_mcmc of samples are generated
-        for _ in tqdm.tqdm(range(n_mcmc)):
-            p_idx, p_sample, p_log_L, p_log_prior = propose_sample()
-            p_log_posterior = p_log_L+p_log_prior
-
-            # Metropolis algorithm
-            if len(mcmc_chain) == 0:
-                mcmc_chain.append(p_idx)
-                log_posteriors.append(p_log_posterior)
-                continue
-
-            acceptance_prob = np.amin([1, np.exp(p_log_posterior - log_posteriors[-1])])
-            if np.random.random() <= acceptance_prob:
-                # Accept
-                mcmc_chain.append(p_idx)
-            else:
-                # Reject
-                mcmc_chain.append(mcmc_chain[-1])
-
-        return mcmc_chain
 
     def run(self):
         # FIXME Maybe make it deterministic instead?
@@ -391,7 +399,7 @@ class ConditionalInference():
         if sampled_parameters == ["image_type"]:
             logger.info("All parameters can be explicitly marginalized over. Disabling stochastic sampling")
             # Embarrassingly parallelized
-            logger.info("Using {} CPU core(s) for rapid sampling".format(self.n_cores))
+            logger.info("Using {} CPU core(s) for rapid evidence estimation".format(self.n_cores))
             
             with MultiPool(self.n_cores) as pool:
                 outputs = pool.starmap(
@@ -425,8 +433,7 @@ class ConditionalInference():
         if self.generate_posterior_samples:
             # Generate equal-weighted posterior samples
             logger.info("Generating joint posterior samples. This may take a moment")
-            #joint_posterior_samples = samples.iloc[self.generate_joint_posterior_samples(samples, n_mcmc=len(samples))]
-            joint_posterior_samples = self.regenerate_joint_posterior_samples(samples)
+            joint_posterior_samples = self.generate_joint_posterior_samples(samples)
         else:
             joint_posterior_samples = None
 
