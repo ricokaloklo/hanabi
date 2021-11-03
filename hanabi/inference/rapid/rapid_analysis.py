@@ -334,16 +334,18 @@ class ConditionalInference():
         _mcmc_sampler_kwargs.update(self.mcmc_sampler_kwargs)
         ndim = len(self.joint_search_parameter_keys)
 
+        # NOTE In general you want a high number of live points to properly "scan" the parameter space
+        # But you do not need a low dlogz here
         _nested_sampler_kwargs = {
-            "nlive": 500,
+            "nlive": 1000,
             "nact": 20,
-            "dlogz": 0.1,
+            "dlogz": 100,
         }
         _nested_sampler_kwargs.update(self.nested_sampler_kwargs)
         
         # Start the chain at the peaks within the samples
         # This effectively only selects points with very high log likelihood ratio/posterior
-        p0 = samples.sort_values(by="log_likelihood_ratio", ascending=False).iloc[:_mcmc_sampler_kwargs["nwalkers"]][self.joint_search_parameter_keys]
+        p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:_mcmc_sampler_kwargs["nwalkers"]][self.joint_search_parameter_keys]
         
         image_type_pnames = sorted([p for p in self.joint_search_parameter_keys if p.startswith("image_type")])
         # FIXME Start a quick nested sampling run with parameters fixed other than 1) psi 2) image_types
@@ -356,6 +358,9 @@ class ConditionalInference():
 
         # Start a nested sampling run
         logger.info("Launching nested sampling for exploring degenerate psi-image_type parameter space")
+        # Disabling logging
+        logging.disable(logging.INFO)
+
         explore_prior = bilby.core.prior.PriorDict(explore_prior)
         # FIXME Tune the settings so that it runs FAST
         explore_result = bilby.run_sampler(
@@ -367,7 +372,12 @@ class ConditionalInference():
             npool=self.n_cores,
             **_nested_sampler_kwargs,
         )
+        explore_result.save_to_file(outdir=self.outdir)
+        # Re-enabling logging
+        logging.disable(logging.NOTSET)
 
+        logger.info("Possible combinations of the image types:")
+        print(explore_result.posterior.groupby(image_type_pnames).size())
         possible_image_type_combos = explore_result.posterior.groupby(image_type_pnames).groups
         chunks = np.array_split(np.arange(len(p0)), len(possible_image_type_combos))
         # Seed the walkers
