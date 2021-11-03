@@ -468,7 +468,7 @@ class ConditionalInference():
             "ln_evidence: {:6.3f} +/- {:6.3f}\n"
             "ln_bayes_factor: {:6.3f} +/- {:6.3f}\n"
             "ln_coherence_ratio: {:6.3f}\n"
-            .format(self.log_joint_noise_evidence, self.log_joint_evidence, self.log_joint_evidence_err, self.log_bayes_factor, self.log_joint_evidence - np.sum([r.log_evidence for r in self.single_trigger_results]))
+            .format(self.log_joint_noise_evidence, self.log_joint_evidence, self.log_joint_evidence_err, self.log_bayes_factor, self.log_joint_evidence_err, self.log_joint_evidence - np.sum([r.log_evidence for r in self.single_trigger_results]))
         )
         logger.info("Summary of results:\n{}".format(result_summary))
 
