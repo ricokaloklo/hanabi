@@ -96,6 +96,9 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             self.n_posterior = self.downsample
         self.n_cores = self.request_cpus
 
+        self.mcmc_sampler_kwargs = bilby_pipe.utils.convert_string_to_dict(self.mcmc_sampler_kwargs)
+        self.nested_sampler_kwargs = bilby_pipe.utils.convert_string_to_dict(self.nested_sampler_kwargs)
+
     def parse_lensing_prior_dict(self):
         # Pre-process/convert the prior dict string
         lensing_prior_dict = bilby_pipe.utils.convert_prior_string_input(self.lensing_prior_dict)
@@ -213,6 +216,8 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 n_cores=self.n_cores,
                 waveform_cache=self.waveform_cache,
                 generate_posterior_samples=self.generate_posterior_samples,
+                mcmc_sampler_kwargs=self.mcmc_sampler_kwargs,
+                nested_sampler_kwargs=self.nested_sampler_kwargs,
             )
 
             logger = logging.getLogger(__prog__)
@@ -244,6 +249,8 @@ class ConditionalInference():
             label="label",
             waveform_cache=True,
             generate_posterior_samples=False,
+            mcmc_sampler_kwargs={},
+            nested_sampler_kwargs={},
         ):
         self.trigger_ids = trigger_ids
         self.single_trigger_likelihoods = single_trigger_likelihoods
@@ -258,6 +265,8 @@ class ConditionalInference():
         self.label = label
         self.waveform_cache = waveform_cache
         self.generate_posterior_samples = generate_posterior_samples
+        self.mcmc_sampler_kwargs = mcmc_sampler_kwargs
+        self.nested_sampler_kwargs = nested_sampler_kwargs
 
         self.sep_char = sep_char
         if suffix is None:
@@ -295,7 +304,7 @@ class ConditionalInference():
 
         self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
 
-    def generate_joint_posterior_samples(self, samples, **kwargs):
+    def generate_joint_posterior_samples(self, samples):
         # Compute the log posterior to choose a better MCMC starting point
         theta_to_evaluate = samples[self.joint_parameter_keys]
         log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
@@ -318,24 +327,35 @@ class ConditionalInference():
         samples["log_likelihood_ratio"] = log_Ls - self.log_joint_noise_evidence
         samples["log_prior"] = log_priors
 
-        # Number of walkers in the ensemble
+        _mcmc_sampler_kwargs = {
+            "nwalkers": 40,
+            "iterations": 5000,
+        }
+        _mcmc_sampler_kwargs.update(self.mcmc_sampler_kwargs)
         ndim = len(self.joint_search_parameter_keys)
-        nwalkers = kwargs.get("nwalkers", 40)
-        iterations = kwargs.get("iterations", 500)
+
+        _nested_sampler_kwargs = {
+            "nlive": 500,
+            "nact": 20,
+            "dlogz": 0.1,
+        }
+        _nested_sampler_kwargs.update(self.nested_sampler_kwargs)
         
         # Start the chain at the peaks within the samples
         # This effectively only selects points with very high log likelihood ratio/posterior
-        p0 = samples.sort_values(by="log_likelihood_ratio", ascending=False).iloc[:nwalkers][self.joint_search_parameter_keys]
+        p0 = samples.sort_values(by="log_likelihood_ratio", ascending=False).iloc[:_mcmc_sampler_kwargs["nwalkers"]][self.joint_search_parameter_keys]
         
-        image_type_pnames = [p for p in self.joint_search_parameter_keys if p.startswith("image_type")]
+        image_type_pnames = sorted([p for p in self.joint_search_parameter_keys if p.startswith("image_type")])
         # FIXME Start a quick nested sampling run with parameters fixed other than 1) psi 2) image_types
         explore_prior = {}
-        for p in self.joint_search_parameter_keys:
+        for p in sorted(self.joint_search_parameter_keys):
             if p in image_type_pnames or p == "psi":
                 explore_prior[p] = copy.deepcopy(self.joint_priors[p])
             else:
                 explore_prior[p] = p0.iloc[0][p]
+
         # Start a nested sampling run
+        logger.info("Launching nested sampling for exploring degenerate psi-image_type parameter space")
         explore_prior = bilby.core.prior.PriorDict(explore_prior)
         # FIXME Tune the settings so that it runs FAST
         explore_result = bilby.run_sampler(
@@ -344,11 +364,10 @@ class ConditionalInference():
             sampler="dynesty",            
             outdir=self.outdir,
             label="explore_psi_degeneracy",
-            nlive=1000,
-            nact=20,
-            dlogz=0.1,
             npool=self.n_cores,
+            **_nested_sampler_kwargs,
         )
+
         possible_image_type_combos = explore_result.posterior.groupby(image_type_pnames).groups
         chunks = np.array_split(np.arange(len(p0)), len(possible_image_type_combos))
         # Seed the walkers
@@ -358,33 +377,33 @@ class ConditionalInference():
                 for p_idx, pname in enumerate(image_type_pnames):
                     p0.iloc[j][pname] = combo[p_idx]
                 # Assign psi
-                p0.iloc[j]["psi"] = explore_result.posterior.iloc[row_indices].sort_values("log_likelihood", ascending=False).iloc[c_idx]["psi"]        
+                p0.iloc[j]["psi"] = explore_result.posterior.iloc[row_indices].sort_values("log_likelihood", ascending=False).iloc[c_idx]["psi"]
+ 
         p0 = p0.to_numpy()
 
-        logger.info("Launching MCMC for posterior samples")
+        logger.info("Launching MCMC for joint posterior samples")
         import zeus
 
         with MultiPool(self.n_cores) as pool:
             mcmc_sampler = zeus.EnsembleSampler(
-                nwalkers,
+                _mcmc_sampler_kwargs["nwalkers"],
                 ndim,
                 lnpostfn,
                 pool=pool,
                 args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys],
             )
-            mcmc_sampler.run_mcmc(p0, iterations)
+            mcmc_sampler.run_mcmc(p0, _mcmc_sampler_kwargs["iterations"])
 
         logger.info("MCMC completed")
 
         posterior_samples = mcmc_sampler.chain[:, :, :].reshape((-1, ndim))
         posterior_samples = pd.DataFrame(posterior_samples, columns=self.joint_search_parameter_keys)
 
-        """
         # Make sure that the image_type parameters are integers
         for p in posterior_samples.columns:
             if p.startswith("image_type"):
                 posterior_samples[p] = round(posterior_samples[p])
-        """
+
         return posterior_samples
 
     def run(self):
@@ -440,7 +459,18 @@ class ConditionalInference():
         self.log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
         self.log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
         self.log_joint_noise_evidence = np.sum([r.log_noise_evidence for r in self.single_trigger_results])
+        self.log_bayes_factor = self.log_joint_evidence-self.log_joint_noise_evidence
         samples["log_conditional_evidence"] = log_Z_conditioned
+
+        # Report result
+        result_summary = (
+            "ln_noise_evidence: {:6.3f}\n"
+            "ln_evidence: {:6.3f} +/- {:6.3f}\n"
+            "ln_bayes_factor: {:6.3f} +/- {:6.3f}\n"
+            "ln_coherence_ratio: {:6.3f}\n"
+            .format(self.log_joint_noise_evidence, self.log_joint_evidence, self.log_joint_evidence_err, self.log_bayes_factor, self.log_joint_evidence - np.sum([r.log_evidence for r in self.single_trigger_results]))
+        )
+        logger.info("Summary of results:\n{}".format(result_summary))
 
         if self.generate_posterior_samples:
             # Generate equal-weighted posterior samples
@@ -460,7 +490,7 @@ class ConditionalInference():
             log_evidence=self.log_joint_evidence,
             log_evidence_err=self.log_joint_evidence_err,
             log_noise_evidence=self.log_joint_noise_evidence,
-            log_bayes_factor=self.log_joint_evidence-self.log_joint_noise_evidence,
+            log_bayes_factor=self.log_bayes_factor,
             priors=self.joint_priors
         )
 
