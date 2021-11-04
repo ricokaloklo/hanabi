@@ -154,7 +154,9 @@ def create_rapid_analysis_parser(prog, prog_version):
         "--mcmc-sampler-kwargs",
         type=str,
         default="{}",
-        help="Keyword arguments to be passed to zeus the MCMC sampler",
+        help=(
+            "Keyword arguments to be passed to zeus the MCMC sampler"
+        ),
     )
     posterior_generation_parser.add(
         "--nested-sampler-kwargs",

@@ -376,12 +376,14 @@ class ConditionalInference():
         # Re-enabling logging
         logging.disable(logging.NOTSET)
 
+        possible_image_type_combos = explore_result.posterior.groupby(image_type_pnames)
         logger.info("Possible combinations of the image types:")
-        print(explore_result.posterior.groupby(image_type_pnames).size())
-        possible_image_type_combos = explore_result.posterior.groupby(image_type_pnames).groups
-        chunks = np.array_split(np.arange(len(p0)), len(possible_image_type_combos))
+        image_type_combo_counts = possible_image_type_combos.size()
+        print(image_type_combo_counts.div(image_type_combo_counts.sum()))
+        chunks = np.array_split(np.arange(len(p0)), len(possible_image_type_combos.groups))
+
         # Seed the walkers
-        for i, (combo, row_indices) in enumerate(possible_image_type_combos.items()):
+        for i, (combo, row_indices) in enumerate(possible_image_type_combos.groups.items()):
             for c_idx, j in enumerate(chunks[i]):
                 # Assign image type
                 for p_idx, pname in enumerate(image_type_pnames):
