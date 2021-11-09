@@ -162,6 +162,15 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                     "geocent_time": float(single_trigger_likelihood_with_cache.interferometers.start_time)
                 })
 
+            # Check if image_type is being sampled over
+            if "image_type" not in single_trigger_result.search_parameter_keys:
+                # Simulate run with image_type sampled by shifting the polarization angle
+                logger = logging.getLogger(__prog__)
+                logger.info("\"image type\" is not being sampled in {}. Simulating an inference with this sampled".format(single_trigger_result.label))
+                single_trigger_result = simulate_run_with_image_type_sampled(single_trigger_result, resample=True)
+                # Update also the priors
+                priors = single_trigger_result.priors
+
             # Enforce sky as the reference frame
             _default_sky_prior = {
                 "ra": bilby.core.prior.Uniform(name='ra', minimum=0, maximum=2*np.pi, boundary='periodic'),
@@ -176,25 +185,13 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
 
             # Remove priors in _keys_to_remove
             for k in list(priors.keys()):
-                if k in _keys_to_remove:
+                if k in _keys_to_remove or k.startswith("recalib"):
                     del priors[k]
 
             self.single_trigger_likelihoods.append(single_trigger_likelihood)
             self.single_trigger_likelihoods_with_cache.append(single_trigger_likelihood_with_cache)
             self.single_trigger_priors.append(priors)
             self.single_trigger_results.append(single_trigger_result)
-
-            # Check if image_type is being sampled over
-            for idx in range(len(self.single_trigger_results)):
-                r = self.single_trigger_results[idx]
-
-                if "image_type" not in r.search_parameter_keys:
-                    # Simulate run with image_type sampled by shifting the polarization angle
-                    logger = logging.getLogger(__prog__)
-                    logger.info("\"image type\" is not being sampled in {}. Simulating an inference with this sampled".format(r.label))
-                    self.single_trigger_results[idx] = simulate_run_with_image_type_sampled(r, resample=True)
-                    # Update also the priors
-                    self.single_trigger_priors[idx] = self.single_trigger_results[idx].priors
 
     def combine_runs(self, conditional_inference_results):
         # FIXME Before combining we should check and see if the runs are 'compatible' -- having same priors, etc
@@ -301,7 +298,7 @@ class ConditionalInference():
         self.likelihood_base_with_cache = self.single_trigger_likelihoods_with_cache[self.trigger_ids[0]]
         # NOTE This assumes that all the likelihood functions take the same input parameters
         self.likelihood_parameter_keys = \
-            [p for p in list(self.likelihood_base.priors.sample().keys()) if not p.startswith("recalib")]
+            [p for p in list(self.likelihood_base.priors.sample().keys())]
         self.independent_parameters = [p for p in self.likelihood_parameter_keys if p not in self.common_parameters]
 
         # Reconstruct the effective joint prior
@@ -309,9 +306,6 @@ class ConditionalInference():
         self.joint_priors = {k: self.single_trigger_priors[self.trigger_ids[0]][k] for k in self.common_parameters}
         for trigger_idx in self.trigger_ids:
             for p in self.independent_parameters:
-                if p.startswith("recalib"):
-                    # Ignore calibration uncertainty
-                    continue
                 self.joint_priors[p+self.suffix(trigger_idx)] = copy.deepcopy(self.single_trigger_priors[trigger_idx][p])
                 # Rename the parameter
                 self.joint_priors[p+self.suffix(trigger_idx)].name += self.suffix(trigger_idx)
