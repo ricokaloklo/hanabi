@@ -298,7 +298,7 @@ class ConditionalInference():
         self.likelihood_base_with_cache = self.single_trigger_likelihoods_with_cache[self.trigger_ids[0]]
         # NOTE This assumes that all the likelihood functions take the same input parameters
         self.likelihood_parameter_keys = \
-            [p for p in list(self.likelihood_base.priors.sample().keys())]
+            [p for p in list(self.likelihood_base.priors.sample().keys()) if not p.startswith("recalib")]
         self.independent_parameters = [p for p in self.likelihood_parameter_keys if p not in self.common_parameters]
 
         # Reconstruct the effective joint prior
