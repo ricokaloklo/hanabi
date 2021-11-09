@@ -178,6 +178,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             }
             _keys_to_remove = ["zenith", "azimuth", "time_jitter"]
 
+            single_trigger_likelihood.reference_frame = "sky"
             # Add priors for (ra, dec)
             for k in list(_default_sky_prior.keys()):
                 if k not in list(priors.keys()):
