@@ -314,11 +314,15 @@ class ConditionalInference():
                     # Fail to rename the parameter, maybe no name was assigned in the first place
                     pass
                 # LaTeX label
-                if self.joint_priors[p+self.suffix(trigger_idx)].latex_label.endswith("$"):
-                    self.joint_priors[p+self.suffix(trigger_idx)].latex_label = \
-                        self.joint_priors[p+self.suffix(trigger_idx)].latex_label[:-1] + "{sep_char}{{({n})}}$".format(sep_char=self.sep_char, n=trigger_idx+1)
-                else:
-                    self.joint_priors[p+self.suffix(trigger_idx)].latex_label += self.suffix(trigger_idx)
+                try:
+                    if self.joint_priors[p+self.suffix(trigger_idx)].latex_label.endswith("$"):
+                        self.joint_priors[p+self.suffix(trigger_idx)].latex_label = \
+                            self.joint_priors[p+self.suffix(trigger_idx)].latex_label[:-1] + "{sep_char}{{({n})}}$".format(sep_char=self.sep_char, n=trigger_idx+1)
+                    else:
+                        self.joint_priors[p+self.suffix(trigger_idx)].latex_label += self.suffix(trigger_idx)
+                except:
+                    # Fail to change the LaTeX label
+                    pass
         self.joint_priors = bilby.core.prior.PriorDict(self.joint_priors)
 
         self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
