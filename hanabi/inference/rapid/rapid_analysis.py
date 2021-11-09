@@ -49,7 +49,11 @@ def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
     if not np.isfinite(log_prior):
         return -np.inf
     else:
-        return lnlikefn(x, bilby_likelihood, joint_search_parameter_keys) + log_prior
+        log_like = lnlikefn(x, bilby_likelihood, joint_search_parameter_keys)
+        if not np.isfinite(log_like):
+            return -np.inf
+        else:
+            return log_like + log_prior
 
 class RapidAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
