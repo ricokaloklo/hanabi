@@ -9,7 +9,7 @@ class SingleLikelihoodWithTransformableWaveformCache(GravitationalWaveTransient)
             likelihood.interferometers, likelihood.waveform_generator, time_marginalization=time_marginalization,
             distance_marginalization=distance_marginalization, phase_marginalization=False, priors=likelihood.priors,
             distance_marginalization_lookup_table=distance_marginalization_lookup_table, jitter_time=False,
-            reference_frame=likelihood.reference_frame, time_reference=likelihood.time_reference,
+            reference_frame="sky", time_reference="geocent",
         )
         lh._cache = None
         return lh
