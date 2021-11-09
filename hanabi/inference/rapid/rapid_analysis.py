@@ -176,7 +176,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 "ra": bilby.core.prior.Uniform(name='ra', minimum=0, maximum=2*np.pi, boundary='periodic'),
                 "dec": bilby.core.prior.Cosine(name='dec'),
             }
-            _keys_to_remove = ["zenith", "azimuth"]
+            _keys_to_remove = ["zenith", "azimuth", "time_jitter"]
 
             # Add priors for (ra, dec)
             for k in list(_default_sky_prior.keys()):
