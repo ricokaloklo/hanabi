@@ -162,6 +162,23 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                     "geocent_time": float(single_trigger_likelihood_with_cache.interferometers.start_time)
                 })
 
+            # Enforce sky as the reference frame
+            _default_sky_prior = {
+                "ra": bilby.core.prior.Uniform(name='ra', minimum=0, maximum=2*np.pi, boundary='periodic'),
+                "dec": bilby.core.prior.Cosine(name='dec'),
+            }
+            _keys_to_remove = ["zenith", "azimuth"]
+
+            # Add priors for (ra, dec)
+            for k in list(_default_sky_prior.keys()):
+                if k not in list(priors.keys()):
+                    priors[k] = _default_sky_prior[k]
+
+            # Remove priors in _keys_to_remove
+            for k in list(priors.keys()):
+                if k in _keys_to_remove:
+                    del priors[k]
+
             self.single_trigger_likelihoods.append(single_trigger_likelihood)
             self.single_trigger_likelihoods_with_cache.append(single_trigger_likelihood_with_cache)
             self.single_trigger_priors.append(priors)
