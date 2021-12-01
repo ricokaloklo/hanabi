@@ -65,3 +65,34 @@ def sample_time_dist_marginalized(
         posterior_to_add[k+suffix(trigger_ids[0])] = theta_dict[k] 
 
     return log_evidence, posterior_to_add
+
+def lnpriorfn(x, bilby_prior, joint_search_parameter_keys):
+    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
+    # NOTE The image_type parameters are *discrete*, need to apply transformation
+    for p in theta_dict.keys():
+        if p.startswith("image_type"):
+            theta_dict[p] = round(theta_dict[p])
+            
+    log_prior = bilby_prior.ln_prob(theta_dict)
+    return log_prior
+
+def lnlikefn(x, bilby_likelihood, joint_search_parameter_keys):
+    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
+    # NOTE The image_type parameters are *discrete*, need to apply transformation
+    for p in theta_dict.keys():
+        if p.startswith("image_type"):
+            theta_dict[p] = round(theta_dict[p])
+
+    bilby_likelihood.parameters.update(theta_dict)
+    return bilby_likelihood.log_likelihood()
+
+def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
+    log_prior = lnpriorfn(x, bilby_prior, joint_search_parameter_keys)
+    if not np.isfinite(log_prior):
+        return -np.inf
+    else:
+        log_like = lnlikefn(x, bilby_likelihood, joint_search_parameter_keys)
+        if not np.isfinite(log_like):
+            return -np.inf
+        else:
+            return log_like + log_prior
