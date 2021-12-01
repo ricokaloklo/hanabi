@@ -2,33 +2,6 @@ import numpy as np
 from bilby.gw.likelihood import GravitationalWaveTransient
 from ...lensing.waveform import morse_phase_from_image_type
 
-class ConditionalLikelihood(Likelihood):
-    def __init__(self, parameters={}, trigger_ids=None, common_parameters=None, independent_parameters=None, base_posterior_samples=None, likelihood=None):
-        super(ConditionalLikelihood, self).__init__(parameters=parameters)
-
-        self.trigger_ids = trigger_ids
-        self.common_parameters = common_parameters
-        self.independent_parameters = independent_parameters
-        self.base_posterior_samples = base_posterior_samples
-        self.likelihood = likelihood
-
-    def log_likelihood(self):
-        ind = int(self.parameters["ind"])
-        log_Z_cond = self.base_posterior_samples.iloc[ind]["log_conditional_evidence"]
-
-        # Update the likelihood parameter
-        # Common parameters from base posterior samples
-        self.likelihood.parameters.update(self.base_posterior_samples.iloc[ind][self.common_parameters].to_dict())
-        # The independent parameters
-        # NOTE for JointLikelihood it assumes that the superscript starts from 0
-        # This means we will have to rename the parameters
-        for p in self.independent_parameters:
-            for new_trigger_idx, old_trigger_idx in enumerate(self.trigger_ids[1:]):
-                self.likelihood.parameters[p+self.likelihood.suffix(new_trigger_idx)] = \
-                    self.parameters[p+self.likelihood.suffix(old_trigger_idx)]
-
-        return self.likelihood.log_likelihood() - log_Z_cond
-
 class SingleLikelihoodWithTransformableWaveformCache(GravitationalWaveTransient):
     @classmethod
     def from_likelihood(cls, likelihood, time_marginalization=False, distance_marginalization=False, distance_marginalization_lookup_table=None):
