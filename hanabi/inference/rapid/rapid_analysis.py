@@ -19,41 +19,11 @@ from .utils import simulate_run_with_image_type_sampled
 from .likelihood import SingleLikelihoodWithTransformableWaveformCache
 from ..utils import ParameterSuffix, load_run_from_bilby, load_run_from_pbilby
 from ...lensing.likelihood import LensingJointLikelihood, LensingJointLikelihoodWithWaveformCache
+from .sampler import lnpriorfn, lnlikefn, lnpostfn
 
 from ..utils import get_version_information
 __version__ = get_version_information()
 __prog__ = "hanabi_rapid_analysis"
-
-def lnpriorfn(x, bilby_prior, joint_search_parameter_keys):
-    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
-    # NOTE The image_type parameters are *discrete*, need to apply transformation
-    for p in theta_dict.keys():
-        if p.startswith("image_type"):
-            theta_dict[p] = round(theta_dict[p])
-            
-    log_prior = bilby_prior.ln_prob(theta_dict)
-    return log_prior
-
-def lnlikefn(x, bilby_likelihood, joint_search_parameter_keys):
-    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
-    # NOTE The image_type parameters are *discrete*, need to apply transformation
-    for p in theta_dict.keys():
-        if p.startswith("image_type"):
-            theta_dict[p] = round(theta_dict[p])
-
-    bilby_likelihood.parameters.update(theta_dict)
-    return bilby_likelihood.log_likelihood()
-
-def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
-    log_prior = lnpriorfn(x, bilby_prior, joint_search_parameter_keys)
-    if not np.isfinite(log_prior):
-        return -np.inf
-    else:
-        log_like = lnlikefn(x, bilby_likelihood, joint_search_parameter_keys)
-        if not np.isfinite(log_like):
-            return -np.inf
-        else:
-            return log_like + log_prior
 
 class RapidAnalysisInput(bilby_pipe.input.Input):
     def __init__(self, args, unknown_args, test=False):
@@ -329,6 +299,30 @@ class ConditionalInference():
         self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
 
     def generate_joint_posterior_samples(self, samples):
+        # Compute the log normalized conditional posterior
+        log_priors = []
+        log_Ls = []
+
+        for trigger_idx in self.trigger_ids[1:]:
+            theta_to_evaluate = samples[[p for p in self.likelihood_parameter_keys if p in self.common_parameters]].copy()
+            for p in self.independent_parameters:
+                theta_to_evaluate[p] = samples[p+self.suffix(trigger_idx)]
+            
+            log_prior = self.single_trigger_priors[trigger_idx].ln_prob(theta_to_evaluate, axis=0)
+            with MultiPool(self.n_cores) as pool:
+                log_L = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[self.single_trigger_likelihoods[trigger_idx], theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))]))
+
+            log_priors.append(log_prior)
+            log_Ls.append(log_L)
+
+        log_priors = np.sum(np.array(log_priors), axis=0)
+        log_Ls = np.sum(np.array(log_Ls), axis=0)
+        log_wts = log_Ls - samples["log_conditional_evidence"]
+        samples["log_weight"] = log_wts
+
+        return bilby.core.result.rejection_sample(samples, np.exp(log_wts))
+
+    def regenerate_joint_posterior_samples(self, samples):
         # Compute the log posterior to choose a better MCMC starting point
         theta_to_evaluate = samples[self.joint_parameter_keys]
         log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
@@ -362,8 +356,8 @@ class ConditionalInference():
         # But you do not need a low dlogz here
         _nested_sampler_kwargs = {
             "nlive": 1000,
-            "nact": 20,
-            "dlogz": 100,
+            "nact": 50,
+            "dlogz": 10,
         }
         _nested_sampler_kwargs.update(self.nested_sampler_kwargs)
         
