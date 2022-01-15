@@ -12,7 +12,7 @@ from scipy.special import logsumexp
 from schwimmbad import SerialPool, MultiPool
 from dynesty.utils import resample_equal
 
-from .sampler import sample_time_dist_marginalized
+from .sampler import sample_time_dist_marginalized, generate_independent_parameters
 from .parser import create_rapid_analysis_parser
 from .utils import _dist_marg_lookup_table_filename_template
 from .utils import compute_log_likelihood_for_theta, compute_log_joint_evidence_from_log_conditional_evidence, bootstrap_uncertainty
@@ -305,7 +305,6 @@ class ConditionalInference():
         logger.info("Launching denmarf to perform density estimation")
 
         # Perform density estimates using deep learning
-        #density_estimates = []
         density_estimate_filenames = []
         common_likelihood_parameter_keys = [p for p in self.common_parameters if p in self.likelihood_parameter_keys]
 
@@ -337,7 +336,6 @@ class ConditionalInference():
             
             de.save(pickle_filename)
             del de
-            #density_estimates.append(copy.deepcopy(de))
 
         # Load the density estimates back
         density_estimates = []
@@ -365,14 +363,33 @@ class ConditionalInference():
                 ),
                 np.exp(lp),
             )
-            
-        _n_iterations = 1000
+
+        # Generate samples for the common parameters by reweighting
+        _n_iterations = 2000
         joint_posterior_samples = None
 
+        logger.info("Reweighting posterior samples")
         for _ in tqdm.tqdm(range(_n_iterations)):
             joint_posterior_samples = pd.concat((joint_posterior_samples, generate_samples_from_reweighting()))
 
-        return joint_posterior_samples
+        # Reconstruct marginalized parameters
+        # Embarrassingly parallelized
+        logger.info("Using {} CPU core(s) for reconstructing marginalized parameters".format(self.n_cores))
+        with MultiPool(self.n_cores) as pool:
+            full_joint_posterior_samples = pool.starmap(
+                generate_independent_parameters,
+                tqdm.tqdm([[
+                    joint_posterior_samples.iloc[i].to_dict(),
+                    self.trigger_ids,
+                    self.suffix,
+                    self.independent_parameters,
+                    self.lensing_prior_dict,
+                    self.single_trigger_priors,
+                    self.single_trigger_likelihoods_with_cache,
+                ] for i in range(len(joint_posterior_samples))])
+            )
+
+        return pd.DataFrame(full_joint_posterior_samples)
 
     def run(self):
         # FIXME Maybe make it deterministic instead?
@@ -440,6 +457,7 @@ class ConditionalInference():
         )
         logger.info("Summary of results:\n{}".format(result_summary))
 
+        joint_posterior_samples = None
         if self.generate_joint_posterior_samples:
             joint_posterior_samples = self.generate_joint_posterior_samples()
 
@@ -449,7 +467,7 @@ class ConditionalInference():
             label=self.label,
             sampler="hanabi_rapid_analysis",
             search_parameter_keys=self.joint_search_parameter_keys,
-            posterior=None,
+            posterior=joint_posterior_samples,
             samples=samples,
             log_evidence=self.log_joint_evidence,
             log_evidence_err=self.log_joint_evidence_err,

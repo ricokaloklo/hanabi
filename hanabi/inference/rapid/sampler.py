@@ -1,4 +1,6 @@
 import numpy as np
+import pandas as pd
+import itertools
 from scipy.special import logsumexp
 
 def sample_time_dist_marginalized(
@@ -66,33 +68,69 @@ def sample_time_dist_marginalized(
 
     return log_evidence, posterior_to_add
 
-def lnpriorfn(x, bilby_prior, joint_search_parameter_keys):
-    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
-    # NOTE The image_type parameters are *discrete*, need to apply transformation
-    for p in theta_dict.keys():
-        if p.startswith("image_type"):
-            theta_dict[p] = round(theta_dict[p])
-            
-    log_prior = bilby_prior.ln_prob(theta_dict)
-    return log_prior
+def generate_independent_parameters_per_image_type(
+        likelihood,
+        theta,
+        ref_distance,
+        image_type
+):
+    likelihood.parameters.update(theta)
+    likelihood.parameters.update({'image_type': image_type, 'luminosity_distance': ref_distance})  
+    return likelihood.generate_posterior_sample_from_marginalized_likelihood()
 
-def lnlikefn(x, bilby_likelihood, joint_search_parameter_keys):
-    theta_dict = {k: x[idx] for idx, k in enumerate(joint_search_parameter_keys)}
-    # NOTE The image_type parameters are *discrete*, need to apply transformation
-    for p in theta_dict.keys():
-        if p.startswith("image_type"):
-            theta_dict[p] = round(theta_dict[p])
+def generate_independent_parameters(
+        theta,
+        trigger_ids,
+        suffix,
+        independent_parameters,
+        lensing_prior_dict,
+        single_trigger_priors,
+        single_trigger_likelihoods_with_cache,
+):
+    joint_log_priors = []
+    joint_log_Ls = []
+    # First generate samples for time and distance as if the signal is of type I
+    posterior = dict(theta)
+    for trigger_idx in trigger_ids:
+        parameters = generate_independent_parameters_per_image_type(
+            likelihood=single_trigger_likelihoods_with_cache[trigger_idx],
+            theta=theta,
+            ref_distance=single_trigger_priors[trigger_idx]["luminosity_distance"].rescale(0.5),
+            image_type=1.0,
+        )
+        for p in independent_parameters:
+            posterior[p+suffix(trigger_idx)] = parameters[p]
 
-    bilby_likelihood.parameters.update(theta_dict)
-    return bilby_likelihood.log_likelihood()
+    possible_image_types = [1.0, 2.0, 3.0]
+    image_type_combos = list(tuple(itertools.product(possible_image_types, repeat=len(trigger_ids))))
+    # Then iterate over all possible combinations
+    for image_type_combo in image_type_combos:
+        log_prior = 0.
+        log_L = 0
+        for trigger_idx in trigger_ids:
+            single_trigger_likelihoods_with_cache[trigger_idx].parameters.update(theta)
+            single_trigger_likelihoods_with_cache[trigger_idx].parameters.update(
+                {
+                    "image_type": image_type_combo[trigger_idx],
+                    "geocent_time": float(single_trigger_likelihoods_with_cache[trigger_idx].interferometers.start_time),
+                    "luminosity_distance": posterior["luminosity_distance"+suffix(trigger_idx)],
+                }
+            )
+            log_L += single_trigger_likelihoods_with_cache[trigger_idx].log_likelihood()
+            log_prior += lensing_prior_dict["image_type"+suffix(trigger_idx)].ln_prob(image_type_combo[trigger_idx])
+        joint_log_priors.append(log_prior)
+        joint_log_Ls.append(log_L)
 
-def lnpostfn(x, bilby_likelihood, bilby_prior, joint_search_parameter_keys):
-    log_prior = lnpriorfn(x, bilby_prior, joint_search_parameter_keys)
-    if not np.isfinite(log_prior):
-        return -np.inf
-    else:
-        log_like = lnlikefn(x, bilby_likelihood, joint_search_parameter_keys)
-        if not np.isfinite(log_like):
-            return -np.inf
-        else:
-            return log_like + log_prior
+    joint_log_priors = np.array(joint_log_priors)
+    joint_log_Ls = np.array(joint_log_Ls)
+    log_norm = logsumexp(joint_log_Ls, b=np.exp(joint_log_priors))
+
+    drawn_image_types = np.random.choice(np.arange(len(image_type_combos)), p=np.exp(joint_log_Ls + joint_log_priors - log_norm))
+    #drawn_image_types = np.argmax(joint_log_Ls + joint_log_priors - log_norm)
+    posterior.update(
+        {"image_type"+suffix(trigger_idx): image_type_combos[drawn_image_types][trigger_idx] for trigger_idx in trigger_ids}
+    )
+    posterior.update(
+        {"log_likelihood": joint_log_Ls[drawn_image_types]}
+    )
+    return posterior
