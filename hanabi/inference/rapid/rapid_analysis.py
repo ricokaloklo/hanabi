@@ -3,6 +3,7 @@ import copy
 import itertools
 import logging
 import tqdm
+import os.path
 import numpy as np
 import pandas as pd
 import bilby
@@ -19,7 +20,6 @@ from .utils import simulate_run_with_image_type_sampled
 from .likelihood import SingleLikelihoodWithTransformableWaveformCache
 from ..utils import ParameterSuffix, load_run_from_bilby, load_run_from_pbilby
 from ...lensing.likelihood import LensingJointLikelihood, LensingJointLikelihoodWithWaveformCache
-from .sampler import lnpriorfn, lnlikefn, lnpostfn
 
 from ..utils import get_version_information
 __version__ = get_version_information()
@@ -298,143 +298,81 @@ class ConditionalInference():
 
         self.joint_search_parameter_keys = [k for k in list(self.joint_priors.keys()) if type(self.joint_priors[k]) != bilby.core.prior.Constraint]
 
-    def generate_joint_posterior_samples(self, samples):
-        # Compute the log normalized conditional posterior
-        log_priors = []
-        log_Ls = []
-
-        for trigger_idx in self.trigger_ids[1:]:
-            theta_to_evaluate = samples[[p for p in self.likelihood_parameter_keys if p in self.common_parameters]].copy()
-            for p in self.independent_parameters:
-                theta_to_evaluate[p] = samples[p+self.suffix(trigger_idx)]
-            
-            log_prior = self.single_trigger_priors[trigger_idx].ln_prob(theta_to_evaluate, axis=0)
-            with MultiPool(self.n_cores) as pool:
-                log_L = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[self.single_trigger_likelihoods[trigger_idx], theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))]))
-
-            log_priors.append(log_prior)
-            log_Ls.append(log_L)
-
-        log_priors = np.sum(np.array(log_priors), axis=0)
-        log_Ls = np.sum(np.array(log_Ls), axis=0)
-        log_wts = log_Ls - samples["log_conditional_evidence"]
-        samples["log_weight"] = log_wts
-
-        return bilby.core.result.rejection_sample(samples, np.exp(log_wts))
-
-    def regenerate_joint_posterior_samples(self, samples):
-        # Compute the log posterior to choose a better MCMC starting point
-        theta_to_evaluate = samples[self.joint_parameter_keys]
-        log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
-
-        if self.waveform_cache:
-            joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
-        else:
-            joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+    def generate_joint_posterior_samples(self):
+        from denmarf.density import DensityEstimate
 
         logger = logging.getLogger(__prog__)
+        logger.info("Launching denmarf to perform density estimation")
 
-        # First compute the log likelihood and log prior for each of the samples for sorting
-        logger.info("Using {} CPU core(s) for likelihood evaluation".format(self.n_cores))
-        with MultiPool(self.n_cores) as pool:
-            log_Ls = pool.starmap(compute_log_likelihood_for_theta, tqdm.tqdm([[joint_likelihood, theta_to_evaluate.iloc[i]] for i in range(len(theta_to_evaluate))]))
-        
-        log_Ls = np.array(log_Ls)
-        log_posterior = log_Ls + log_priors - self.log_joint_evidence
-        samples["log_posterior"] = log_posterior
-        samples["log_likelihood_ratio"] = log_Ls - self.log_joint_noise_evidence
-        samples["log_prior"] = log_priors
+        # Perform density estimates using deep learning
+        #density_estimates = []
+        density_estimate_filenames = []
+        common_likelihood_parameter_keys = [p for p in self.common_parameters if p in self.likelihood_parameter_keys]
 
-        _mcmc_sampler_kwargs = {
-            "nwalkers": 40,
-            "iterations": 5000,
-        }
-        _mcmc_sampler_kwargs.update(self.mcmc_sampler_kwargs)
-        ndim = len(self.joint_search_parameter_keys)
+        for result in self.single_trigger_results:
+            pickle_filename = "{}_density_estimate.pickle".format(result.label)
+            density_estimate_filenames.append(pickle_filename)
 
-        # NOTE In general you want a high number of live points to properly "scan" the parameter space
-        # But you do not need a low dlogz here
-        _nested_sampler_kwargs = {
-            "nlive": 1000,
-            "nact": 50,
-            "dlogz": 10,
-        }
-        _nested_sampler_kwargs.update(self.nested_sampler_kwargs)
-        
-        # Start the chain at the peaks within the samples
-        # This effectively only selects points with very high log likelihood ratio/posterior
-        p0 = samples.sort_values(by="log_posterior", ascending=False).iloc[:_mcmc_sampler_kwargs["nwalkers"]][self.joint_search_parameter_keys]
-        
-        image_type_pnames = sorted([p for p in self.joint_search_parameter_keys if p.startswith("image_type")])
-        # FIXME Start a quick nested sampling run with parameters fixed other than 1) psi 2) image_types
-        explore_prior = {}
-        for p in sorted(self.joint_search_parameter_keys):
-            if p in image_type_pnames or p == "psi":
-                explore_prior[p] = copy.deepcopy(self.joint_priors[p])
-            else:
-                explore_prior[p] = p0.iloc[0][p]
+            if os.path.exists(pickle_filename):
+                logger.info("Using saved model for {}".format(result.label))
+                # Re-use exisiting estimate
+                continue
 
-        # Start a nested sampling run
-        logger.info("Launching nested sampling for exploring degenerate psi-image_type parameter space")
-        # Disabling logging
-        logging.disable(logging.INFO)
+            logger.info("Training for {}".format(result.label))
+            training_samples = result.posterior[common_likelihood_parameter_keys].to_numpy()
+            lower_bounds = np.array([result.priors[p].minimum for p in common_likelihood_parameter_keys])
+            upper_bounds = np.array([result.priors[p].maximum for p in common_likelihood_parameter_keys])
 
-        explore_prior = bilby.core.prior.PriorDict(explore_prior)
-        # FIXME Tune the settings so that it runs FAST
-        explore_result = bilby.run_sampler(
-            likelihood=joint_likelihood,
-            priors=explore_prior,
-            sampler="dynesty",            
-            outdir=self.outdir,
-            label="explore_psi_degeneracy",
-            npool=self.n_cores,
-            **_nested_sampler_kwargs,
-        )
-        explore_result.save_to_file(outdir=self.outdir)
-        # Re-enabling logging
-        logging.disable(logging.NOTSET)
-
-        possible_image_type_combos = explore_result.posterior.groupby(image_type_pnames)
-        logger.info("Possible combinations of the image types:")
-        image_type_combo_counts = possible_image_type_combos.size()
-        print(image_type_combo_counts.div(image_type_combo_counts.sum()))
-        chunks = np.array_split(np.arange(len(p0)), len(possible_image_type_combos.groups))
-
-        # Seed the walkers
-        for i, (combo, row_indices) in enumerate(possible_image_type_combos.groups.items()):
-            for c_idx, j in enumerate(chunks[i]):
-                # Assign image type
-                for p_idx, pname in enumerate(image_type_pnames):
-                    p0.iloc[j][pname] = combo[p_idx]
-                # Assign psi
-                p0.iloc[j]["psi"] = explore_result.posterior.iloc[row_indices].sort_values("log_likelihood", ascending=False).iloc[c_idx]["psi"]
- 
-        p0 = p0.to_numpy()
-
-        logger.info("Launching MCMC for joint posterior samples")
-        import zeus
-
-        with MultiPool(self.n_cores) as pool:
-            mcmc_sampler = zeus.EnsembleSampler(
-                _mcmc_sampler_kwargs["nwalkers"],
-                ndim,
-                lnpostfn,
-                pool=pool,
-                args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys],
+            # FIXME Tune hyper-parameters
+            # NOTE This is going to be very slow on CPU
+            de = DensityEstimate(device="cuda", use_cuda=True, bounded=True).fit(
+                training_samples,
+                lower_bounds=lower_bounds,
+                upper_bounds=upper_bounds,
+                batch_size=int(0.5*training_samples.shape[0]),
+                num_blocks=8,
+                num_hidden=64,
+                num_epochs=1000,
             )
-            mcmc_sampler.run_mcmc(p0, _mcmc_sampler_kwargs["iterations"])
+            
+            de.save(pickle_filename)
+            del de
+            #density_estimates.append(copy.deepcopy(de))
 
-        logger.info("MCMC completed")
+        # Load the density estimates back
+        density_estimates = []
+        for i in range(len(density_estimate_filenames)):
+            density_estimates.append(DensityEstimate.from_file(
+                density_estimate_filenames[i],
+                device="cuda",
+                use_cuda=True,
+            ))
+ 
+        # A helper routine to generate some samples
+        def generate_samples_from_reweighting(base_trigger_idx=0):
+            _n_samples = 10000
+            new_samples = density_estimates[base_trigger_idx].sample(_n_samples)
+            lp = np.zeros(_n_samples)
+            for idx in self.trigger_ids:
+                if idx == base_trigger_idx:
+                    continue
+                lp += density_estimates[idx].score_samples(new_samples)
 
-        posterior_samples = mcmc_sampler.chain[:, :, :].reshape((-1, ndim))
-        posterior_samples = pd.DataFrame(posterior_samples, columns=self.joint_search_parameter_keys)
+            return bilby.result.rejection_sample(
+                pd.DataFrame(
+                    new_samples,
+                    columns=common_likelihood_parameter_keys,
+                ),
+                np.exp(lp),
+            )
+            
+        _n_iterations = 1000
+        joint_posterior_samples = None
 
-        # Make sure that the image_type parameters are integers
-        for p in posterior_samples.columns:
-            if p.startswith("image_type"):
-                posterior_samples[p] = round(posterior_samples[p])
+        for _ in tqdm.tqdm(range(_n_iterations)):
+            joint_posterior_samples = pd.concat((joint_posterior_samples, generate_samples_from_reweighting()))
 
-        return posterior_samples
+        return joint_posterior_samples
 
     def run(self):
         # FIXME Maybe make it deterministic instead?
@@ -502,12 +440,8 @@ class ConditionalInference():
         )
         logger.info("Summary of results:\n{}".format(result_summary))
 
-        if self.generate_posterior_samples:
-            # Generate equal-weighted posterior samples
-            logger.info("Generating joint posterior samples. This may take a moment")
-            joint_posterior_samples = self.generate_joint_posterior_samples(samples)
-        else:
-            joint_posterior_samples = None
+        if self.generate_joint_posterior_samples:
+            joint_posterior_samples = self.generate_joint_posterior_samples()
 
         # Save to file
         joint_result = bilby.core.result.Result(
@@ -515,7 +449,7 @@ class ConditionalInference():
             label=self.label,
             sampler="hanabi_rapid_analysis",
             search_parameter_keys=self.joint_search_parameter_keys,
-            posterior=joint_posterior_samples,
+            posterior=None,
             samples=samples,
             log_evidence=self.log_joint_evidence,
             log_evidence_err=self.log_joint_evidence_err,
