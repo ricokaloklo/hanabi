@@ -12,7 +12,7 @@ from scipy.special import logsumexp
 from schwimmbad import SerialPool, MultiPool
 from dynesty.utils import resample_equal
 
-from .sampler import sample_time_dist_marginalized, generate_independent_parameters
+from .sampler import sample_time_dist_marginalized, generate_all_parameters
 from .parser import create_rapid_analysis_parser
 from .utils import _dist_marg_lookup_table_filename_template
 from .utils import compute_log_likelihood_for_theta, compute_log_joint_evidence_from_log_conditional_evidence, bootstrap_uncertainty
@@ -329,7 +329,7 @@ class ConditionalInference():
                 lower_bounds=lower_bounds,
                 upper_bounds=upper_bounds,
                 batch_size=int(0.5*training_samples.shape[0]),
-                num_blocks=8,
+                num_blocks=16,
                 num_hidden=64,
                 num_epochs=1000,
             )
@@ -365,7 +365,7 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        _n_iterations = 2000
+        _n_iterations = 1000
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
@@ -377,7 +377,7 @@ class ConditionalInference():
         logger.info("Using {} CPU core(s) for reconstructing marginalized parameters".format(self.n_cores))
         with MultiPool(self.n_cores) as pool:
             full_joint_posterior_samples = pool.starmap(
-                generate_independent_parameters,
+                generate_all_parameters,
                 tqdm.tqdm([[
                     joint_posterior_samples.iloc[i].to_dict(),
                     self.trigger_ids,
@@ -389,7 +389,20 @@ class ConditionalInference():
                 ] for i in range(len(joint_posterior_samples))])
             )
 
-        return pd.DataFrame(full_joint_posterior_samples)
+        full_joint_posterior_samples = pd.DataFrame(full_joint_posterior_samples)
+        log_normalization = logsumexp(full_joint_posterior_samples["log_likelihood"])
+        full_joint_posterior_samples["log_likelihood"] -= log_normalization
+
+        # Purge low log likelihood samples
+        # FIXME Need to tune
+        out = None
+        for _ in tqdm.tqdm(range(_n_iterations)):
+            out = pd.concat((out, bilby.result.rejection_sample(
+                full_joint_posterior_samples,
+                np.exp(full_joint_posterior_samples["log_likelihood"])
+            )))
+
+        return out
 
     def run(self):
         # FIXME Maybe make it deterministic instead?

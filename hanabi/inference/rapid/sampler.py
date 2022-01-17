@@ -75,10 +75,14 @@ def generate_independent_parameters_per_image_type(
         image_type
 ):
     likelihood.parameters.update(theta)
-    likelihood.parameters.update({'image_type': image_type, 'luminosity_distance': ref_distance})  
+    likelihood.parameters.update({
+        'image_type': image_type,
+        'luminosity_distance': ref_distance,
+        'geocent_time': float(likelihood.interferometers.start_time),
+    })  
     return likelihood.generate_posterior_sample_from_marginalized_likelihood()
 
-def generate_independent_parameters(
+def generate_all_parameters(
         theta,
         trigger_ids,
         suffix,
@@ -126,7 +130,6 @@ def generate_independent_parameters(
     log_norm = logsumexp(joint_log_Ls, b=np.exp(joint_log_priors))
 
     drawn_image_types = np.random.choice(np.arange(len(image_type_combos)), p=np.exp(joint_log_Ls + joint_log_priors - log_norm))
-    #drawn_image_types = np.argmax(joint_log_Ls + joint_log_priors - log_norm)
     posterior.update(
         {"image_type"+suffix(trigger_idx): image_type_combos[drawn_image_types][trigger_idx] for trigger_idx in trigger_ids}
     )
