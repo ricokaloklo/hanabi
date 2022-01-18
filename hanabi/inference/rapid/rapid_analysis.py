@@ -405,6 +405,64 @@ class ConditionalInference():
 
         return out
 
+    def regenerate_joint_posterior_samples_from_mcmc(self, samples):
+        theta_to_evaluate = samples[self.joint_search_parameter_keys]
+        log_priors = self.joint_priors.ln_prob(theta_to_evaluate, axis=0)
+
+        if self.waveform_cache:
+            joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+        else:
+            joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
+
+        logger = logging.getLogger(__prog__)
+
+        _mcmc_sampler_kwargs = {
+            "nwalkers": 64,
+            "iterations": 500,
+        }
+        _mcmc_sampler_kwargs.update(self.mcmc_sampler_kwargs)
+        ndim = len(self.joint_search_parameter_keys)
+        nwalkers = _mcmc_sampler_kwargs["nwalkers"]
+
+        image_type_pnames = sorted([p for p in self.joint_search_parameter_keys if p.startswith("image_type")])
+        possible_image_type_combos = samples.groupby(image_type_pnames)
+        #logger.info("Possible combinations of the image types:")
+        image_type_combo_counts = possible_image_type_combos.size()
+        #print(image_type_combo_counts.div(image_type_combo_counts.sum()))
+        chunks = np.array_split(np.arange(nwalkers), len(possible_image_type_combos.groups))
+
+        # Seed the walkers
+        p0 = None
+        for i, (combo, row_indices) in enumerate(possible_image_type_combos.groups.items()):
+            for c_idx, j in enumerate(chunks[i]):
+                p0 = pd.concat((p0, theta_to_evaluate.iloc[row_indices].sample()))
+
+        logger.info("Launching MCMC for joint posterior samples")
+        import zeus
+
+        with MultiPool(self.n_cores) as pool:
+            mcmc_sampler = zeus.EnsembleSampler(
+                nwalkers,
+                ndim,
+                lnpostfn,
+                pool=pool,
+                args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys],
+                moves=zeus.moves.GlobalMove(),
+            )
+            mcmc_sampler.run_mcmc(p0, _mcmc_sampler_kwargs["iterations"])
+
+        logger.info("MCMC completed")
+
+        posterior_samples = mcmc_sampler.chain[:, :, :].reshape((-1, ndim))
+        posterior_samples = pd.DataFrame(posterior_samples, columns=self.joint_search_parameter_keys)
+
+        # Make sure that the image_type parameters are integers
+        for p in posterior_samples.columns:
+            if p.startswith("image_type"):
+                posterior_samples[p] = round(posterior_samples[p])
+
+        return posterior_samples
+
     def run(self):
         # FIXME Maybe make it deterministic instead?
         theta_to_evaluate = self.single_trigger_results[self.trigger_ids[0]].posterior.sample(self.n_posterior)
@@ -474,6 +532,8 @@ class ConditionalInference():
         joint_posterior_samples = None
         if self.generate_joint_posterior_samples:
             joint_posterior_samples = self.generate_joint_posterior_samples()
+            # Refine posterior samples with MCMC
+            joint_posterior_samples = self.regenerate_joint_posterior_samples_from_mcmc(joint_posterior_samples)
 
         # Save to file
         joint_result = bilby.core.result.Result(
