@@ -141,7 +141,7 @@ def generate_joint_posterior_sample_from_marginalized_likelihood(
         for p in [q for q in independent_parameters if q.endswith(suffix(idx))]:
             # Replace with the newly generated sample
             pos_in[p] = pos_out[p.replace(suffix(idx), "")]
-            
+            del pos_in[p.replace(suffix(idx), "")]
     return pos_in
 
 def generate_joint_posterior_samples_from_marginalized_likelihood(
