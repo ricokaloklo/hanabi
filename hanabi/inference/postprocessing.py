@@ -25,6 +25,22 @@ def create_parser(prog):
     )
     parser.add("result", type=str, help="The result file")
 
+    parser.add(
+        "--output-filename",
+        type=str,
+        help="Save output with this filename",
+    )
+
+    generating_derived_parameters_parser = parser.add_argument_group(title="Generating derived parameters")
+    generating_derived_parameters_parser.add(
+        "--generate-component-mass-parameters",
+        action="store_true",
+        default=False,
+        help=(
+            "Generate samples of component masses if missing"
+        )
+    )
+
     prior_reweighting_parser = parser.add_argument_group(title="Prior reweighting")
     prior_reweighting_parser.add(
         "--flat-in-component-masses",
@@ -82,14 +98,19 @@ def create_parser(prog):
 
     return parser
 
-def reweight_flat_in_component_masses(result):
+def generate_component_mass_parameters(result):
     logger = logging.getLogger(__prog__)
-    logger.info("Reweighting prior to be flat in component masses")
     if not all([k in result.posterior.columns for k in ["mass_1", "mass_2"]]):
         # Missing mass_1 mass_2 columns
         converted_posterior, added_keys = convert_to_lal_binary_black_hole_parameters_for_lensed_BBH(result.posterior)
         result.posterior = converted_posterior
         logger.info("Adding {} samples".format(", ".join(added_keys)))
+    return result
+
+def reweight_flat_in_component_masses(result):
+    logger = logging.getLogger(__prog__)
+    logger.info("Reweighting prior to be flat in component masses")
+    result = generate_component_mass_parameters(result)
     result_reweighted = convert_to_flat_in_component_mass_prior(result)
     # NOTE Here we reweight the **evidence** as well
     weights = np.array(result.get_weights_by_new_prior(result.priors, result_reweighted.priors,
@@ -194,6 +215,10 @@ def main():
         generate_joint_posterior_samples_from_marginalized_likelihood(result, single_trigger_likelihoods, ncores=args.ncores)
         label += "_marginalized_parameter_reconstructed"
 
+    if args.generate_component_mass_parameters:
+        # Edit file **in-place**
+        result = generate_component_mass_parameters(result)
+
     if args.flat_in_component_masses:
         result = reweight_flat_in_component_masses(result)
         label += "_reweighted"
@@ -205,5 +230,5 @@ def main():
     # Save to file
     logger.info("Done. Saving to file")
     result.label = label
-    result.save_to_file(outdir=".")
+    result.save_to_file(outdir=".", filename=args.output_filename)
 
