@@ -80,9 +80,7 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
     def __init__(self, result, mass_src_pop_model, spin_src_pop_model, magnification_joint_distribution, sampling_priors=None, sep_char="^", suffix=None, n_samples=None):
         # The likelihood is a function of the source redshift only
         # Might as well do this marginalization deterministically
-        self.parameters = {'redshift': 0.0}
-        self._meta_data = None
-        self._marginalized_parameters = []
+        super(MonteCarloMarginalizedLikelihood, self).__init__(parameters={'redshift': 0.0})
         self.result = result
         self.mass_src_pop_model = mass_src_pop_model
         self.spin_src_pop_model = spin_src_pop_model
@@ -130,6 +128,9 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
             # Fall back to numpy
             self.use_gpu = False
             logger.info("Using CPU for likelihood evaluation")
+
+        # Test the likelihood evaluation
+        _ = self.log_likelihood()
 
     def compute_ln_prob_for_luminosity_distances(self, z_src):
         parameters = ["luminosity_distance" + self.suffix(trigger_idx) for trigger_idx, _ in enumerate(self.magnification_joint_distribution.keys())]
