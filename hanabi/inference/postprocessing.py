@@ -1,6 +1,8 @@
 import sys
 import numpy as np
 import pandas as pd
+import copy
+import bilby
 from bilby.core.result import Result, read_in_result
 from bilby.core.result import reweight
 from bilby.gw.prior import convert_to_flat_in_component_mass_prior, UniformComovingVolume
@@ -49,7 +51,7 @@ def create_parser(prog):
         help=(
             "Reweight the result to follow a flat prior in component masses. "
             "It is recommended to use directly `UniformInComponentsChirpMass' and "
-            "`UniformInComponentsMassRatio' in sampling instead of reweighting"
+            "`UniformInComponentsMassRatio' in sampling"
         )
     )
     prior_reweighting_parser.add(
@@ -57,6 +59,12 @@ def create_parser(prog):
         action="store_true",
         default=False,
         help="Reweight the result to follow a uniform-in-comoving-volume prior in luminosity distance"
+    )
+
+    prior_reweighting_parser.add(
+        "--reweight-to-prior",
+        type=str,
+        help="Reweight the prior according to this prior file",
     )
 
     reconstruction_parser = parser.add_argument_group(title="Reconstructing samples for marginalized parameter(s)")
@@ -107,6 +115,31 @@ def generate_component_mass_parameters(result):
         logger.info("Adding {} samples".format(", ".join(added_keys)))
     return result
 
+def reweight_to_prior(result, new_priors):
+    old_priors = result.priors
+    target_priors = old_priors.copy()
+
+    for param in old_priors.keys():
+        try:
+            target_priors[param] = new_priors[param]
+        except:
+            continue
+    target_priors = bilby.core.prior.PriorDict(target_priors)
+
+    logger = logging.getLogger(__prog__)
+    logger.info("Reweighting to the following prior")
+    logger.info(target_priors)
+
+    params = list(old_priors.keys())
+    ln_weights = target_priors.ln_prob(result.posterior[params], axis=0) - old_priors.ln_prob(result.posterior[params], axis=0)
+    result_reweighted = copy.deepcopy(result)
+    result_reweighted.priors = target_priors
+    result_reweighted.posterior = bilby.result.rejection_sample(result_reweighted.posterior, np.exp(ln_weights))
+    result_reweighted.log_evidence = result.log_evidence + logsumexp(ln_weights) - np.log(len(result.posterior))
+    result_reweighted.log_bayes_factor = result.log_bayes_factor + logsumexp(ln_weights) - np.log(len(result.posterior))
+
+    return result_reweighted
+
 def reweight_flat_in_component_masses(result):
     logger = logging.getLogger(__prog__)
     logger.info("Reweighting prior to be flat in component masses")
@@ -139,8 +172,7 @@ def reweight_uniform_in_comoving_volume(result):
                 latex_label=old_priors[name].latex_label
             )
 
-    result_reweighted = reweight(result, old_prior=old_priors, new_prior=new_priors)
-
+    result_reweighted = reweight_to_prior(result, new_priors)
     return result_reweighted
 
 def generate_joint_posterior_sample_from_marginalized_likelihood(
@@ -218,6 +250,10 @@ def main():
     if args.generate_component_mass_parameters:
         # Edit file **in-place**
         result = generate_component_mass_parameters(result)
+
+    if args.reweight_to_prior is not None:
+        result = reweight_to_prior(result, bilby.core.prior.PriorDict(filename=args.reweight_to_prior))
+        label += "_reweighted"
 
     if args.flat_in_component_masses:
         result = reweight_flat_in_component_masses(result)
