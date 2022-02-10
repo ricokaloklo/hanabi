@@ -38,9 +38,7 @@ def create_parser(prog):
         "--generate-component-mass-parameters",
         action="store_true",
         default=False,
-        help=(
-            "Generate samples of component masses if missing"
-        )
+        help="Generate samples of component masses if missing",
     )
 
     prior_reweighting_parser = parser.add_argument_group(title="Prior reweighting")
@@ -72,19 +70,32 @@ def create_parser(prog):
         "--generate-samples-for-marginalized-parameters",
         action="store_true",
         default=False,
-        help="Reconstruct the full joint posterior samples for marginalized parameter(s) such as luminosity distance"
+        help="Reconstruct the full posterior samples for marginalized parameter(s) such as luminosity distance",
+    )
+    reconstruction_parser.add(
+        "--generate-snrs",
+        action="store_true",
+        default=False,
+        help="Generate matched filter and optimal SNRs",
     )
     reconstruction_parser.add(
         "--n-triggers",
         type=int,
-        help="Number of triggers analyzed jointly"
+        default=1,
+        help="Number of triggers analyzed jointly",
+    )
+    reconstruction_parser.add(
+        "--not-from-hanabi",
+        action="store_true",
+        default=False,
+        help="The inference was done using vanilla bilby instead of hanabi.inference",
     )
     reconstruction_parser.add(
         "--trigger-ini-files",
         action="append",
         help=(
             "A list of configuration ini files for each trigger analyzed, "
-            "specified either by `trigger-ini-file=[PATH_1, PATH2]` or "
+            "specified either by `trigger-ini-files=[PATH_1, PATH2]` or "
             "as command-line arguments by `--trigger-ini-files PATH1 --trigger-ini-files PATH2`"
         )
     )
@@ -105,6 +116,20 @@ def create_parser(prog):
     )
 
     return parser
+
+def reconstruct_likelihoods(n_triggers, trigger_ini_files, data_dump_files, result_from_pbilby=False):
+    single_trigger_likelihoods = []
+    
+    if result_from_pbilby:
+        for i in range(n_triggers):
+            l, _, _ = load_run_from_pbilby(data_dump_files[i])
+            single_trigger_likelihoods.append(l)
+    else:
+        for i in range(n_triggers):
+            l, _, _ = load_run_from_bilby(data_dump_files[i], trigger_ini_files[i])
+            single_trigger_likelihoods.append(l)
+
+    return single_trigger_likelihoods
 
 def generate_component_mass_parameters(result):
     logger = logging.getLogger(__prog__)
@@ -175,6 +200,85 @@ def reweight_uniform_in_comoving_volume(result):
     result_reweighted = reweight_to_prior(result, new_priors)
     return result_reweighted
 
+def generate_snrs_per_sample(sample, likelihood):
+    bilby.gw.conversion.compute_snrs(sample, likelihood)
+    return sample
+
+def generate_snrs(result, likelihood, ncores=1):
+    logger = logging.getLogger(__prog__)
+    logger.info("Using {} CPU core(s) for computing SNRs".format(ncores))
+    import tqdm
+    with MultiPool(ncores) as pool:
+        output_samples = pool.starmap(
+            generate_snrs_per_sample,
+            tqdm.tqdm([[row.to_dict(), likelihood] for _, row in result.posterior.iterrows()])
+        )
+    result.posterior = pd.DataFrame(output_samples)
+    return result
+
+def generate_joint_snrs_per_sample(
+    joint_sample,
+    single_trigger_likelihoods,
+    common_parameters,
+    independent_parameters,
+    sep_char,
+):
+    suffix = ParameterSuffix(sep_char)
+    pos_in = joint_sample[common_parameters].to_dict()
+    for idx, likelihood in enumerate(single_trigger_likelihoods):
+        for p in [q for q in independent_parameters if q.endswith(suffix(idx))]:
+            # Fill in the appropriate values
+            pos_in[p.replace(suffix(idx), "")] = joint_sample[p]
+        pos_out = generate_snrs_per_sample(pos_in, likelihood)
+
+        # Add SNRs
+        for p in [q for q in pos_out.keys() if "snr" in q]:
+            joint_sample[p+suffix(idx)] = pos_out[p]
+
+    return joint_sample.to_dict()
+
+def generate_joint_snrs(
+    joint_result,
+    single_trigger_likelihoods,
+    sep_char="^",
+    ncores=1,
+):
+    common_parameters = [p for p in list(joint_result.posterior.columns) if sep_char not in p]
+    independent_parameters = [p for p in list(joint_result.posterior.columns) if sep_char in p]
+    
+    logger = logging.getLogger(__prog__)
+    logger.info("Using {} CPU core(s) for computing SNRs".format(ncores))
+    import tqdm
+    with MultiPool(ncores) as pool:
+        output_samples = pool.starmap(
+            generate_joint_snrs_per_sample,
+            tqdm.tqdm([[row, single_trigger_likelihoods, common_parameters, independent_parameters, sep_char] for _, row in joint_result.posterior.iterrows()])
+        )
+
+    # Edit data frame
+    joint_result.posterior = pd.DataFrame(output_samples)
+    return joint_result
+
+def generate_posterior_samples_from_marginalized_likelihood(
+    result,
+    likelihood,
+    ncores=1,
+):
+    # Use the routine in bilby.gw.conversion instead
+    pos_out = bilby.gw.conversion.generate_posterior_samples_from_marginalized_likelihood(
+        result.posterior,
+        likelihood,
+        npool=ncores,
+    )
+    
+    # Update posterior
+    result.posterior = pos_out
+    # Update prior
+    priors = bilby.core.prior.PriorDict(filename=result.meta_data["command_line_args"]["prior_file"])
+    result.priors.update(priors)
+    
+    return result
+
 def generate_joint_posterior_sample_from_marginalized_likelihood(
     joint_posterior_sample_from_marginalized_likelihood,
     single_trigger_likelihoods,
@@ -217,6 +321,7 @@ def generate_joint_posterior_samples_from_marginalized_likelihood(
 
     # Edit data frame
     joint_result.posterior = pd.DataFrame(output_samples)
+    return joint_result
 
 def main():
     args, unknown_args = parse_args(sys.argv[1:], create_parser(__prog__))
@@ -234,22 +339,40 @@ def main():
         pass
 
     if args.generate_samples_for_marginalized_parameters:
-        single_trigger_likelihoods = []
-        if result_from_pbilby:
-            for i in range(args.n_triggers):
-                l, _, _ = load_run_from_pbilby(args.data_dump_files[i])
-                single_trigger_likelihoods.append(l)
-        else:
-            for i in range(args.n_triggers):
-                l, _, _ = load_run_from_bilby(args.data_dump_files[i], args.trigger_ini_files[i])
-                single_trigger_likelihoods.append(l)
+        single_trigger_likelihoods = reconstruct_likelihoods(
+            n_triggers=args.n_triggers,
+            trigger_ini_files=args.trigger_ini_files,
+            data_dump_files=args.data_dump_files,
+            result_from_pbilby=result_from_pbilby,
+        )
         
-        generate_joint_posterior_samples_from_marginalized_likelihood(result, single_trigger_likelihoods, ncores=args.ncores)
+        if not args.not_from_hanabi:
+            result = generate_joint_posterior_samples_from_marginalized_likelihood(result, single_trigger_likelihoods, ncores=args.ncores)
+        else:
+            if args.n_triggers != 1:
+                raise ValueError("Does not understand input")
+            result = generate_posterior_samples_from_marginalized_likelihood(result, single_trigger_likelihoods[0], ncores=args.ncores)
         label += "_marginalized_parameter_reconstructed"
 
     if args.generate_component_mass_parameters:
         # Edit file **in-place**
         result = generate_component_mass_parameters(result)
+
+    if args.generate_snrs:
+        single_trigger_likelihoods = reconstruct_likelihoods(
+            n_triggers=args.n_triggers,
+            trigger_ini_files=args.trigger_ini_files,
+            data_dump_files=args.data_dump_files,
+            result_from_pbilby=result_from_pbilby,
+        )
+        
+        # Edit file **in-place**
+        if not args.not_from_hanabi:
+            result = generate_joint_snrs(result, single_trigger_likelihoods, ncores=args.ncores)
+        else:
+            if args.n_triggers != 1:
+                raise ValueError("Does not understand input")
+            result = generate_snrs(result, single_trigger_likelihoods[0], ncores=args.ncores)
 
     if args.reweight_to_prior is not None:
         result = reweight_to_prior(result, bilby.core.prior.PriorDict(filename=args.reweight_to_prior))
