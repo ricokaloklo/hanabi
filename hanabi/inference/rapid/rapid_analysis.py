@@ -72,7 +72,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
         self.n_cores = self.request_cpus
 
         self.mcmc_sampler_kwargs = bilby_pipe.utils.convert_string_to_dict(self.mcmc_sampler_kwargs)
-        self.nested_sampler_kwargs = bilby_pipe.utils.convert_string_to_dict(self.nested_sampler_kwargs)
+        self.denmarf_kwargs = bilby_pipe.utils.convert_string_to_dict(self.denmarf_kwargs)
 
     def parse_lensing_prior_dict(self):
         # Pre-process/convert the prior dict string
@@ -207,7 +207,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 waveform_cache=self.waveform_cache,
                 generate_posterior_samples=self.generate_posterior_samples,
                 mcmc_sampler_kwargs=self.mcmc_sampler_kwargs,
-                nested_sampler_kwargs=self.nested_sampler_kwargs,
+                denmarf_kwargs=self.denmarf_kwargs,
             )
 
             logger = logging.getLogger(__prog__)
@@ -240,7 +240,7 @@ class ConditionalInference():
             waveform_cache=True,
             generate_posterior_samples=False,
             mcmc_sampler_kwargs={},
-            nested_sampler_kwargs={},
+            denmarf_kwargs={},
         ):
         self.trigger_ids = trigger_ids
         self.single_trigger_likelihoods = single_trigger_likelihoods
@@ -256,7 +256,7 @@ class ConditionalInference():
         self.waveform_cache = waveform_cache
         self.generate_posterior_samples = generate_posterior_samples
         self.mcmc_sampler_kwargs = mcmc_sampler_kwargs
-        self.nested_sampler_kwargs = nested_sampler_kwargs
+        self.denmarf_kwargs = denmarf_kwargs
 
         self.sep_char = sep_char
         if suffix is None:
@@ -346,7 +346,7 @@ class ConditionalInference():
                 device="cuda",
                 use_cuda=True,
             ))
- 
+
         # A helper routine to generate some samples
         def generate_samples_from_reweighting(base_trigger_idx=0):
             _n_samples = 10000
@@ -366,7 +366,7 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        _n_iterations = 10000
+        _n_iterations = 1000
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
@@ -517,7 +517,7 @@ class ConditionalInference():
         logger.info("Summary of results:\n{}".format(result_summary))
 
         joint_posterior_samples = None
-        if self.generate_joint_posterior_samples:
+        if self.generate_posterior_samples:
             joint_posterior_samples = self.generate_joint_posterior_samples()
 
         # Save to file

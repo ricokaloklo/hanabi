@@ -159,10 +159,10 @@ def create_rapid_analysis_parser(prog, prog_version):
         ),
     )
     posterior_generation_parser.add(
-        "--nested-sampler-kwargs",
+        "--denmarf-kwargs",
         type=str,
         default="{}",
-        help="Keyword arguments to be passed to dynesty the nested sampler",
+        help="Keyword arguments to be passed to denmarf for density estimation using masked autoregressive flow",
     )
 
     return parser
