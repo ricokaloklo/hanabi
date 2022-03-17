@@ -98,6 +98,27 @@ class AnalyticalBBHMergerRateDensity(MergerRateDensity):
 
         return np.nan_to_num(a_1*np.exp(a_2*z)/(a_4 + np.exp(a_3*z))*((z >= 0.0) & (z < redshift_max)))
 
+class MadauDickinsonMergerRateDensity(MergerRateDensity):
+    def __init__(self, R_0, z_p, alpha, beta, redshift_max):
+        super(MadauDickinsonMergerRateDensity, self).__init__(
+            population_parameter_dict={
+                'R_0': R_0,
+                'z_p': z_p,
+                'alpha': alpha,
+                'beta': beta,
+                'redshift_max': redshift_max,
+            }
+        )
+
+    def evaluate(self, z):
+        R_0 = self.population_parameter_dict['R_0']
+        z_p = self.population_parameter_dict['z_p']
+        alpha = self.population_parameter_dict['alpha']
+        beta = self.population_parameter_dict['beta']
+        redshift_max = self.population_parameter_dict['redshift_max']
+
+        return np.nan_to_num(((R_0*(1.+z)**alpha)/(1.+((1.+z)/(1.+z_p))**(alpha+beta))) *((z >= 0.0) & (z < redshift_max)))
+
 class BelczynskiEtAl2017PopIPopIIStarsBBHMergerRateDensity(AnalyticalBBHMergerRateDensity):
     def __init__(self):
         super(BelczynskiEtAl2017PopIPopIIStarsBBHMergerRateDensity, self).__init__(
