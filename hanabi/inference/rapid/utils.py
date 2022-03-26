@@ -76,13 +76,13 @@ def simulate_run_with_image_type_sampled(result_with_no_img_type, likelihood, nc
     
     # For type-III image, it is the same as adding pi/2 to psi
     simulated_posteriors["type_III"] = result_with_no_img_type.posterior.copy()
-    simulated_posteriors["type_III"]["psi"] = np.mod(result_with_no_img_type["psi"] + np.pi/2., np.pi)
+    simulated_posteriors["type_III"]["psi"] = np.mod(simulated_posteriors["type_III"]["psi"] + np.pi/2., np.pi)
 
     result = copy.deepcopy(result_with_no_img_type)
     # Concatenating will preserve the posterior pdf at the expensive of storing more samples
     result.posterior = pd.concat(list(simulated_posteriors.values()))
     if resample:
-        result.posterior = result.posterior.sample(len(new_posteriors[0]))
+        result.posterior = result.posterior.sample(len(result_with_no_img_type.posterior))
     result.priors["image_type"] = DiscreteUniform(name="image_type", minimum=1, N=3)
 
     return result

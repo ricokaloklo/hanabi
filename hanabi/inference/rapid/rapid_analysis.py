@@ -36,6 +36,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             if not name.startswith("_"):
                 setattr(self, name, getattr(args, name, None))
         self.parse_lensing_prior_dict()
+        self.n_cores = self.request_cpus
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
@@ -69,7 +70,6 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
         else:
             # FIXME This assumes that the given --downsample is sane
             self.n_posterior = self.downsample
-        self.n_cores = self.request_cpus
 
         self.mcmc_sampler_kwargs = bilby_pipe.utils.convert_string_to_dict(self.mcmc_sampler_kwargs)
         self.denmarf_kwargs = bilby_pipe.utils.convert_string_to_dict(self.denmarf_kwargs)
@@ -138,7 +138,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 # Simulate run with image_type sampled by shifting the polarization angle
                 logger = logging.getLogger(__prog__)
                 logger.info("\"image type\" is not being sampled in {}. Simulating an inference with this sampled".format(single_trigger_result.label))
-                single_trigger_result = simulate_run_with_image_type_sampled(single_trigger_result, resample=True)
+                single_trigger_result = simulate_run_with_image_type_sampled(single_trigger_result, single_trigger_likelihood, ncores=self.n_cores, resample=True)
                 # Update also the priors
                 priors = single_trigger_result.priors
 
