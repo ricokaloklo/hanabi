@@ -52,11 +52,12 @@ def _search_for_degenerate_psi(row, l):
     new_row["psi"] = new_psi
     return new_row
 
-def simulate_run_with_image_type_sampled(result_with_no_img_type, likelihood, ncores=1, resample=False):
+def simulate_run_with_image_type_sampled(result_with_no_img_type, likelihood, ncores=1, save_to_file=True, resample=False):
     simulated_posteriors = {}
     
     # For type-I image, it is the same as the unlensed waveform
     simulated_posteriors["type_I"] = result_with_no_img_type.posterior.copy()
+    simulated_posteriors["type_I"]["image_type"] = 1.0 * np.ones(len(simulated_posteriors["type_I"]))
     
     # For type-II image, we search for the psi that would produce the exact same log likelihood 
     # (and hence same waveform as seen in detector)
@@ -73,10 +74,12 @@ def simulate_run_with_image_type_sampled(result_with_no_img_type, likelihood, nc
         )
     out = pd.DataFrame(out)
     simulated_posteriors["type_II"] = out
+    simulated_posteriors["type_II"]["image_type"] = 2.0 * np.ones(len(simulated_posteriors["type_II"]))
     
     # For type-III image, it is the same as adding pi/2 to psi
     simulated_posteriors["type_III"] = result_with_no_img_type.posterior.copy()
     simulated_posteriors["type_III"]["psi"] = np.mod(simulated_posteriors["type_III"]["psi"] + np.pi/2., np.pi)
+    simulated_posteriors["type_III"]["image_type"] = 3.0 * np.ones(len(simulated_posteriors["type_III"]))
 
     result = copy.deepcopy(result_with_no_img_type)
     # Concatenating will preserve the posterior pdf at the expensive of storing more samples
@@ -84,6 +87,9 @@ def simulate_run_with_image_type_sampled(result_with_no_img_type, likelihood, nc
     if resample:
         result.posterior = result.posterior.sample(len(result_with_no_img_type.posterior))
     result.priors["image_type"] = DiscreteUniform(name="image_type", minimum=1, N=3)
+
+    if save_to_file:
+        result.save_to_file(outdir=".", filename="{}_image_type_simulated_result.json".format(result.label))
 
     return result
 
