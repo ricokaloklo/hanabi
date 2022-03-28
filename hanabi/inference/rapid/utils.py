@@ -84,6 +84,7 @@ def simulate_run_with_image_type_sampled(result_with_no_img_type, likelihood, nc
     result = copy.deepcopy(result_with_no_img_type)
     # Concatenating will preserve the posterior pdf at the expensive of storing more samples
     result.posterior = pd.concat(list(simulated_posteriors.values()))
+    result.search_parameter_keys.append("image_type")
     if resample:
         result.posterior = result.posterior.sample(len(result_with_no_img_type.posterior))
     result.priors["image_type"] = DiscreteUniform(name="image_type", minimum=1, N=3)
