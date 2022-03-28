@@ -365,7 +365,7 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        n_samples = 25000
+        n_samples = 50000
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
@@ -399,7 +399,7 @@ class ConditionalInference():
         # Purge low log likelihood samples
         # FIXME Need to tune
         out = None
-        _n_iterations = 10
+        _n_iterations = 1000
         for _ in tqdm.tqdm(range(_n_iterations)):
             out = pd.concat((out, bilby.result.rejection_sample(
                 full_joint_posterior_samples,
