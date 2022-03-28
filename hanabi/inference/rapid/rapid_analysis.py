@@ -365,7 +365,7 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        n_samples = 50000
+        n_samples = 10000
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
@@ -393,20 +393,8 @@ class ConditionalInference():
             )
 
         full_joint_posterior_samples = pd.DataFrame(full_joint_posterior_samples)
-        log_normalization = logsumexp(full_joint_posterior_samples["log_likelihood"])
-        full_joint_posterior_samples["log_likelihood"] -= log_normalization
-
-        # Purge low log likelihood samples
-        # FIXME Need to tune
-        out = None
-        _n_iterations = 1000
-        for _ in tqdm.tqdm(range(_n_iterations)):
-            out = pd.concat((out, bilby.result.rejection_sample(
-                full_joint_posterior_samples,
-                np.exp(full_joint_posterior_samples["log_likelihood"])
-            )))
-
-        return out
+        
+        return full_joint_posterior_samples
 
     def regenerate_joint_posterior_samples_from_mcmc(self, samples):
         theta_to_evaluate = samples[self.joint_search_parameter_keys]
