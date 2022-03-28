@@ -365,7 +365,7 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        n_samples = 10000
+        n_samples = 5000
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
@@ -388,6 +388,7 @@ class ConditionalInference():
                     self.independent_parameters,
                     self.lensing_prior_dict,
                     self.single_trigger_priors,
+                    self.single_trigger_likelihoods,
                     self.single_trigger_likelihoods_with_cache,
                 ] for i in range(len(joint_posterior_samples))])
             )
