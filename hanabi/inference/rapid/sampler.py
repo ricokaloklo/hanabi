@@ -79,7 +79,7 @@ def generate_independent_parameters_per_image_type(
         'image_type': image_type,
         'luminosity_distance': ref_distance,
         'geocent_time': float(likelihood.interferometers.start_time),
-    })  
+    })
     return likelihood.generate_posterior_sample_from_marginalized_likelihood()
 
 def generate_all_parameters(
@@ -89,6 +89,7 @@ def generate_all_parameters(
         independent_parameters,
         lensing_prior_dict,
         single_trigger_priors,
+        single_trigger_likelihoods,
         single_trigger_likelihoods_with_cache,
 ):
     joint_log_priors = []
@@ -110,17 +111,17 @@ def generate_all_parameters(
     # Then iterate over all possible combinations
     for image_type_combo in image_type_combos:
         log_prior = 0.
-        log_L = 0
+        log_L = 0.
         for trigger_idx in trigger_ids:
-            single_trigger_likelihoods_with_cache[trigger_idx].parameters.update(theta)
-            single_trigger_likelihoods_with_cache[trigger_idx].parameters.update(
+            single_trigger_likelihoods[trigger_idx].parameters.update(theta)
+            single_trigger_likelihoods[trigger_idx].parameters.update(
                 {
                     "image_type": image_type_combo[trigger_idx],
-                    "geocent_time": float(single_trigger_likelihoods_with_cache[trigger_idx].interferometers.start_time),
+                    "geocent_time": posterior["geocent_time"+suffix(trigger_idx)],
                     "luminosity_distance": posterior["luminosity_distance"+suffix(trigger_idx)],
                 }
             )
-            log_L += single_trigger_likelihoods_with_cache[trigger_idx].log_likelihood()
+            log_L += single_trigger_likelihoods[trigger_idx].log_likelihood()
             log_prior += lensing_prior_dict["image_type"+suffix(trigger_idx)].ln_prob(image_type_combo[trigger_idx])
         joint_log_priors.append(log_prior)
         joint_log_Ls.append(log_L)
