@@ -348,8 +348,7 @@ class ConditionalInference():
             ))
 
         # A helper routine to generate some samples
-        def generate_samples_from_reweighting(base_trigger_idx=0):
-            _n_samples = 10000
+        def generate_samples_from_reweighting(base_trigger_idx=0, _n_samples=10000):
             new_samples = density_estimates[base_trigger_idx].sample(_n_samples)
             lp = np.zeros(_n_samples)
             for idx in self.trigger_ids:
@@ -366,12 +365,15 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        _n_iterations = 1000
+        n_samples = 25000
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
-        for _ in tqdm.tqdm(range(_n_iterations)):
-            joint_posterior_samples = pd.concat((joint_posterior_samples, generate_samples_from_reweighting()))
+        with tqdm.tqdm(total=n_samples) as pbar:
+            while joint_posterior_samples is None or len(joint_posterior_samples) < n_samples:
+                new_samples = generate_samples_from_reweighting()
+                joint_posterior_samples = pd.concat((joint_posterior_samples, new_samples))
+                pbar.update(len(new_samples))
 
         # Reconstruct marginalized parameters
         # Embarrassingly parallelized
@@ -397,6 +399,7 @@ class ConditionalInference():
         # Purge low log likelihood samples
         # FIXME Need to tune
         out = None
+        _n_iterations = 10
         for _ in tqdm.tqdm(range(_n_iterations)):
             out = pd.concat((out, bilby.result.rejection_sample(
                 full_joint_posterior_samples,
