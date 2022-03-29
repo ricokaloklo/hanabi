@@ -71,7 +71,6 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             # FIXME This assumes that the given --downsample is sane
             self.n_posterior = self.downsample
 
-        self.mcmc_sampler_kwargs = bilby_pipe.utils.convert_string_to_dict(self.mcmc_sampler_kwargs)
         self.denmarf_kwargs = bilby_pipe.utils.convert_string_to_dict(self.denmarf_kwargs)
 
     def parse_lensing_prior_dict(self):
@@ -206,7 +205,7 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 n_cores=self.n_cores,
                 waveform_cache=self.waveform_cache,
                 generate_posterior_samples=self.generate_posterior_samples,
-                mcmc_sampler_kwargs=self.mcmc_sampler_kwargs,
+                n_samples=self.n_samples,
                 denmarf_kwargs=self.denmarf_kwargs,
             )
 
@@ -239,7 +238,7 @@ class ConditionalInference():
             label="label",
             waveform_cache=True,
             generate_posterior_samples=False,
-            mcmc_sampler_kwargs={},
+            n_samples=10000,
             denmarf_kwargs={},
         ):
         self.trigger_ids = trigger_ids
@@ -255,7 +254,7 @@ class ConditionalInference():
         self.label = label
         self.waveform_cache = waveform_cache
         self.generate_posterior_samples = generate_posterior_samples
-        self.mcmc_sampler_kwargs = mcmc_sampler_kwargs
+        self.n_samples = n_samples
         self.denmarf_kwargs = denmarf_kwargs
 
         self.sep_char = sep_char
@@ -365,7 +364,7 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        n_samples = 25000
+        n_samples = self.n_samples
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
@@ -374,6 +373,9 @@ class ConditionalInference():
                 new_samples = generate_samples_from_reweighting()
                 joint_posterior_samples = pd.concat((joint_posterior_samples, new_samples))
                 pbar.update(len(new_samples))
+
+        # Trim to n_samples
+        joint_posterior_samples = joint_posterior_samples.iloc[0:n_samples]
 
         # Reconstruct marginalized parameters
         # Embarrassingly parallelized

@@ -151,12 +151,10 @@ def create_rapid_analysis_parser(prog, prog_version):
         help="Generate joint posterior samples using Markov Chain Monte Carlo method",
     )
     posterior_generation_parser.add(
-        "--mcmc-sampler-kwargs",
-        type=str,
-        default="{}",
-        help=(
-            "Keyword arguments to be passed to zeus the MCMC sampler"
-        ),
+        "--n-samples",
+        type=int,
+        default=10000,
+        help="Number of joint posterior samples to generate",
     )
     posterior_generation_parser.add(
         "--denmarf-kwargs",
