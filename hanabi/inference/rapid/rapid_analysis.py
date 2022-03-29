@@ -397,51 +397,6 @@ class ConditionalInference():
         
         return full_joint_posterior_samples
 
-    def regenerate_joint_posterior_samples_from_mcmc(self, samples):
-        theta_to_evaluate = samples[self.joint_search_parameter_keys]
-
-        if self.waveform_cache:
-            joint_likelihood = LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
-        else:
-            joint_likelihood = LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
-
-        logger = logging.getLogger(__prog__)
-
-        _mcmc_sampler_kwargs = {
-            "nwalkers": 64,
-            "iterations": 2500,
-        }
-        _mcmc_sampler_kwargs.update(self.mcmc_sampler_kwargs)
-        ndim = len(self.joint_search_parameter_keys)
-        nwalkers = _mcmc_sampler_kwargs["nwalkers"]
-
-        p0 = theta_to_evaluate[self.joint_search_parameter_keys].sample(nwalkers).to_numpy()
-        logger.info("Launching MCMC for joint posterior samples")
-        import zeus
-
-        with MultiPool(self.n_cores) as pool:
-            mcmc_sampler = zeus.EnsembleSampler(
-                nwalkers,
-                ndim,
-                lnpostfn,
-                pool=pool,
-                args=[joint_likelihood, self.joint_priors, self.joint_search_parameter_keys],
-                moves=zeus.moves.GlobalMove(),
-            )
-            mcmc_sampler.run_mcmc(p0, _mcmc_sampler_kwargs["iterations"])
-
-        logger.info("MCMC completed")
-
-        posterior_samples = mcmc_sampler.chain[:, :, :].reshape((-1, ndim))
-        posterior_samples = pd.DataFrame(posterior_samples, columns=self.joint_search_parameter_keys)
-
-        # Make sure that the image_type parameters are integers
-        for p in posterior_samples.columns:
-            if p.startswith("image_type"):
-                posterior_samples[p] = round(posterior_samples[p])
-
-        return posterior_samples
-
     def run(self):
         # FIXME Maybe make it deterministic instead?
         theta_to_evaluate = self.single_trigger_results[self.trigger_ids[0]].posterior.sample(self.n_posterior)
