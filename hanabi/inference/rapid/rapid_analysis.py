@@ -132,15 +132,6 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                     "geocent_time": float(single_trigger_likelihood_with_cache.interferometers.start_time)
                 })
 
-            # Check if image_type is being sampled over
-            if "image_type" not in single_trigger_result.search_parameter_keys:
-                # Simulate run with image_type sampled by shifting the polarization angle
-                logger = logging.getLogger(__prog__)
-                logger.info("\"image type\" is not being sampled in {}. Simulating an inference with this sampled".format(single_trigger_result.label))
-                single_trigger_result = simulate_run_with_image_type_sampled(single_trigger_result, single_trigger_likelihood, ncores=self.n_cores, resample=True)
-                # Update also the priors
-                priors = single_trigger_result.priors
-
             # Enforce sky as the reference frame
             _default_sky_prior = {
                 "ra": bilby.core.prior.Uniform(name='ra', minimum=0, maximum=2*np.pi, boundary='periodic'),
@@ -153,6 +144,21 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             for k in list(_default_sky_prior.keys()):
                 if k not in list(priors.keys()):
                     priors[k] = _default_sky_prior[k]
+
+            # Generate sky-frame parameters
+            bilby.gw.conversion.generate_sky_frame_parameters(
+                single_trigger_result.posterior,
+                single_trigger_likelihood,
+            )
+
+            # Check if image_type is being sampled over
+            if "image_type" not in single_trigger_result.search_parameter_keys:
+                # Simulate run with image_type sampled by shifting the polarization angle
+                logger = logging.getLogger(__prog__)
+                logger.info("\"image type\" is not being sampled in {}. Simulating an inference with this sampled".format(single_trigger_result.label))
+                single_trigger_result = simulate_run_with_image_type_sampled(single_trigger_result, single_trigger_likelihood, ncores=self.n_cores, resample=True)
+                # Update also the priors
+                priors = single_trigger_result.priors
 
             # Remove priors in _keys_to_remove
             for k in list(priors.keys()):
