@@ -365,7 +365,7 @@ class ConditionalInference():
             )
 
         # Generate samples for the common parameters by reweighting
-        n_samples = 5000
+        n_samples = 25000
         joint_posterior_samples = None
 
         logger.info("Reweighting posterior samples")
