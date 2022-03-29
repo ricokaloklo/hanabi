@@ -140,16 +140,20 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             _keys_to_remove = ["zenith", "azimuth", "time_jitter"]
 
             single_trigger_likelihood.reference_frame = "sky"
+            _generate_sky_frame_parameters = False
             # Add priors for (ra, dec)
             for k in list(_default_sky_prior.keys()):
                 if k not in list(priors.keys()):
                     priors[k] = _default_sky_prior[k]
+                if k not in single_trigger_result.posterior.columns:
+                    _generate_sky_frame_parameters = True
 
-            # Generate sky-frame parameters
-            bilby.gw.conversion.generate_sky_frame_parameters(
-                single_trigger_result.posterior,
-                single_trigger_likelihood,
-            )
+            # Generate sky-frame parameters if needed
+            if _generate_sky_frame_parameters:
+                bilby.gw.conversion.generate_sky_frame_parameters(
+                    single_trigger_result.posterior,
+                    single_trigger_likelihood,
+                )
 
             # Check if image_type is being sampled over
             if "image_type" not in single_trigger_result.search_parameter_keys:
