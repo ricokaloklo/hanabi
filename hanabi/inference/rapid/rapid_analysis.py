@@ -16,7 +16,7 @@ from .sampler import sample_time_dist_marginalized, generate_all_parameters
 from .sampler import lnpriorfn, lnlikefn, lnpostfn
 from .parser import create_rapid_analysis_parser
 from .utils import _dist_marg_lookup_table_filename_template
-from .utils import compute_log_likelihood_for_theta, compute_log_joint_evidence_from_log_conditional_evidence, bootstrap_uncertainty
+from .utils import compute_log_likelihood_for_theta, compute_log_joint_evidence_from_log_conditional_evidence, estimate_uncertainty
 from .utils import simulate_run_with_image_type_sampled
 from .likelihood import SingleLikelihoodWithTransformableWaveformCache
 from ..utils import ParameterSuffix, load_run_from_bilby, load_run_from_pbilby
@@ -460,7 +460,7 @@ class ConditionalInference():
         self.joint_parameter_keys = list(samples.columns)
         log_Z_conditioned = np.array(log_Z_conditioned)
         self.log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
-        self.log_joint_evidence_err, _ = bootstrap_uncertainty(log_Z_conditioned)
+        self.log_joint_evidence_err = estimate_uncertainty(self.single_trigger_results[self.trigger_ids[0]].log_evidence_err, log_Z_conditioned)
         self.log_joint_noise_evidence = np.sum([r.log_noise_evidence for r in self.single_trigger_results])
         self.log_bayes_factor = self.log_joint_evidence-self.log_joint_noise_evidence
         samples["log_conditional_evidence"] = log_Z_conditioned

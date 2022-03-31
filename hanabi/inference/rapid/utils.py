@@ -23,18 +23,34 @@ def compute_log_likelihood_for_theta(likelihood, theta):
     return likelihood.log_likelihood()
 
 def compute_log_joint_evidence_from_log_conditional_evidence(base_log_evidence, log_conditional_evidence):
-    return base_log_evidence + logsumexp(log_conditional_evidence) - np.log(len(log_conditional_evidence))
+    log_mean_conditional_evidence = logsumexp(log_conditional_evidence) - np.log(len(log_conditional_evidence))
+    return base_log_evidence + log_mean_conditional_evidence
 
-def bootstrap_uncertainty(log_conditional_evidence, n_frac=0.5, n_resample=1000):   
-    bootstrapped_estimate = []
-    for i in range(n_resample):
-        log_ev = compute_log_joint_evidence_from_log_conditional_evidence(
-            0.,
-            np.random.choice(log_conditional_evidence, size=int(n_frac*len(log_conditional_evidence)), replace=True)
-        )
-        bootstrapped_estimate.append(log_ev)
+def estimate_MonteCarlo_uncertainty(log_fxs):
+    N = len(log_fxs)
+    # mean = 1/N \sum f(x)
+    log_mean = logsumexp(log_fxs) - np.log(N)
+    # log squared sum = \sum f(x)^2
+    log_squared_sum = logsumexp(2*log_fxs)
 
-    return np.std(bootstrapped_estimate), np.array(bootstrapped_estimate)
+    # Monte Carlo Error
+    # Note that this is log \sigma^2
+    log_variance = -np.log(N) - np.log(N-1) + logsumexp([log_squared_sum, 2*log_mean], b=[1, -N])
+    
+    log_upper_bound = logsumexp([log_mean, log_variance/2], b=[1,1])
+    log_lower_bound = logsumexp([log_mean, log_variance/2], b=[1,-1])
+    # Due to the finite numerical accuracy, the two might not be the same
+    log_error_from_log_mean = max(abs(log_upper_bound - log_mean), abs(log_mean - log_lower_bound))
+
+    return log_error_from_log_mean
+
+def estimate_uncertainty(base_log_evidence_err, log_conditional_evidence):
+    log_mean_conditional_evidence_err = estimate_MonteCarlo_uncertainty(log_conditional_evidence)
+
+    # A crude estimate of the joint uncertainty
+    # Note that this implicitly assumes that the error of the base log evidence
+    # is independent of the mean conditional evidence
+    return np.sqrt(base_log_evidence_err**2 + log_mean_conditional_evidence_err**2)
 
 def _search_for_degenerate_psi(row, l):
     # A helper function to do this search
