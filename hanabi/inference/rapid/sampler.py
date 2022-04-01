@@ -133,9 +133,11 @@ def generate_all_parameters(
 
     joint_log_priors = np.array(joint_log_priors)
     joint_log_Ls = np.array(joint_log_Ls)
+    log_norm = logsumexp(joint_log_Ls + joint_log_priors)
 
-    #drawn_image_types = np.random.choice(np.arange(len(image_type_combos)), p=np.exp(joint_log_Ls + joint_log_priors - log_norm))
-    posterior = joint_samples[np.argmax(joint_log_priors + joint_log_Ls)]
+    drawn_image_types = np.random.choice(np.arange(len(all_possible_image_type_combos)), p=np.exp(joint_log_Ls + joint_log_priors - log_norm))
+    #drawn_image_types = np.argmax(joint_log_priors + joint_log_Ls)
+    posterior = joint_samples[drawn_image_types]
     return posterior
 
 def lnpriorfn(x, bilby_prior, joint_search_parameter_keys):
