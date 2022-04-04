@@ -32,10 +32,11 @@ def estimate_MonteCarlo_uncertainty(log_fxs):
     log_mean = logsumexp(log_fxs) - np.log(N)
     # log squared sum = \sum f(x)^2
     log_squared_sum = logsumexp(2*log_fxs)
+    N_eff = np.exp(2*(log_mean + np.log(N)) - log_squared_sum)
 
     # Monte Carlo Error
     # Note that this is log \sigma^2
-    log_variance = -np.log(N) - np.log(N-1) + logsumexp([log_squared_sum, 2*log_mean], b=[1, -N])
+    log_variance = -np.log(N_eff) - np.log(N-1) + logsumexp([log_squared_sum, 2*log_mean], b=[1, -N])
     
     log_upper_bound = logsumexp([log_mean, log_variance/2], b=[1,1])
     log_lower_bound = logsumexp([log_mean, log_variance/2], b=[1,-1])
@@ -46,7 +47,6 @@ def estimate_MonteCarlo_uncertainty(log_fxs):
 
 def estimate_uncertainty(base_log_evidence_err, log_conditional_evidence):
     log_mean_conditional_evidence_err = estimate_MonteCarlo_uncertainty(log_conditional_evidence)
-
     # A crude estimate of the joint uncertainty
     # Note that this implicitly assumes that the error of the base log evidence
     # is independent of the mean conditional evidence
