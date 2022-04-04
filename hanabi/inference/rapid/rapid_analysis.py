@@ -66,7 +66,11 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
         self.initialize_single_trigger_inference_inputs()
 
         if self.downsample is None:
-            self.n_posterior = min([len(r.posterior) for r in self.single_trigger_results])
+            if self.symmetrize:
+                # Use the same number of posterior samples
+                self.n_posterior = min([len(r.posterior) for r in self.single_trigger_results])
+            else:
+                self.n_posterior = len(self.single_trigger_results[self.trigger_combo[0][0]].posterior)
         else:
             # FIXME This assumes that the given --downsample is sane
             self.n_posterior = self.downsample
