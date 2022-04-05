@@ -91,6 +91,8 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
         self.single_trigger_priors = []
         self.single_trigger_results = []
 
+        logger = logging.getLogger(__prog__)
+
         _disable_all_marginalization = {
             "time_marginalization": False,
             "distance_marginalization": False,
@@ -124,18 +126,6 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                 ifo.calibration_model = bilby.gw.detector.calibration.Recalibrate()
                 ifo.strain_data.notch_list = []
 
-            single_trigger_likelihood_with_cache = SingleLikelihoodWithTransformableWaveformCache.from_likelihood(
-                single_trigger_likelihood,
-                time_marginalization=self.time_marginalization,
-                distance_marginalization=self.distance_marginalization,
-                distance_marginalization_lookup_table=_dist_marg_lookup_table_filename_template.format(idx+1)
-            )
-            if self.time_marginalization:
-                # Necessary to make time marginalization works
-                single_trigger_likelihood_with_cache.parameters.update({
-                    "geocent_time": float(single_trigger_likelihood_with_cache.interferometers.start_time)
-                })
-
             # Enforce sky as the reference frame
             _default_sky_prior = {
                 "ra": bilby.core.prior.Uniform(name='ra', minimum=0, maximum=2*np.pi, boundary='periodic'),
@@ -143,7 +133,9 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             }
             _keys_to_remove = ["zenith", "azimuth", "time_jitter"]
 
-            single_trigger_likelihood.reference_frame = "sky"
+            if single_trigger_likelihood.reference_frame != "sky":
+                logger.info("Changing the reference frame to sky")
+                single_trigger_likelihood.reference_frame = "sky"
             _generate_sky_frame_parameters = False
             # Add priors for (ra, dec)
             for k in list(_default_sky_prior.keys()):
@@ -151,7 +143,6 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                     # Consistently update *all* priors
                     priors[k] = _default_sky_prior[k]
                     single_trigger_likelihood.priors[k] = _default_sky_prior[k]
-                    single_trigger_likelihood_with_cache.priors[k] = _default_sky_prior[k]
                     single_trigger_result.priors[k] = _default_sky_prior[k]
                 if k not in single_trigger_result.posterior.columns:
                     _generate_sky_frame_parameters = True
@@ -162,6 +153,23 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
                     single_trigger_result.posterior,
                     single_trigger_likelihood,
                 )
+
+            # Enforce geocenter as the time reference
+            _default_geocent_time_prior = bilby.core.prior.Uniform(
+                    single_trigger_likelihood.interferometers.start_time,
+                    single_trigger_likelihood.interferometers.start_time + single_trigger_likelihood.interferometers.duration
+                )
+            if single_trigger_likelihood.time_reference in [ifo.name for ifo in single_trigger_likelihood.interferometers]:
+                # time reference was *not* geocenter
+                logger.info("Changing the time reference to geocent")
+                # Remove prior
+                if "{}_time".format(single_trigger_likelihood.time_reference) in priors.keys():
+                    _keys_to_remove.append("{}_time".format(single_trigger_likelihood.time_reference))
+                # Add back prior for geocent_time consistently
+                single_trigger_likelihood.time_reference = "geocent"
+                priors["geocent_time"] = _default_geocent_time_prior
+                single_trigger_likelihood.priors["geocent_time"] = _default_geocent_time_prior
+                single_trigger_result.priors["geocent_time"] = _default_geocent_time_prior
 
             # Check if image_type is being sampled over
             if "image_type" not in single_trigger_result.search_parameter_keys:
@@ -176,6 +184,18 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             for k in list(priors.keys()):
                 if k in _keys_to_remove or k.startswith("recalib"):
                     del priors[k]
+
+            single_trigger_likelihood_with_cache = SingleLikelihoodWithTransformableWaveformCache.from_likelihood(
+                single_trigger_likelihood,
+                time_marginalization=self.time_marginalization,
+                distance_marginalization=self.distance_marginalization,
+                distance_marginalization_lookup_table=_dist_marg_lookup_table_filename_template.format(idx+1)
+            )
+            if self.time_marginalization:
+                # Necessary to make time marginalization works
+                single_trigger_likelihood_with_cache.parameters.update({
+                    "geocent_time": float(single_trigger_likelihood_with_cache.interferometers.start_time)
+                })
 
             self.single_trigger_likelihoods.append(single_trigger_likelihood)
             self.single_trigger_likelihoods_with_cache.append(single_trigger_likelihood_with_cache)
@@ -428,7 +448,7 @@ class ConditionalInference():
         logger = logging.getLogger(__prog__)
         if self.waveform_cache:
             logger.info("Using waveform caching")
- 
+        import pdb; pdb.set_trace()
         sampled_parameters = copy.deepcopy(self.independent_parameters)
         if self.likelihood_base_with_cache.time_marginalization:
             sampled_parameters.remove("geocent_time")
