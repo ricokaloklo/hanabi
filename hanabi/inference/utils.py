@@ -1,5 +1,6 @@
 import bilby
 import bilby_pipe
+import bilby_pipe.data_analysis
 import logging
 import os
 from pathlib import Path
