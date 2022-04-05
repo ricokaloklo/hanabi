@@ -448,6 +448,7 @@ class ConditionalInference():
         logger = logging.getLogger(__prog__)
         if self.waveform_cache:
             logger.info("Using waveform caching")
+
         sampled_parameters = copy.deepcopy(self.independent_parameters)
         if self.likelihood_base_with_cache.time_marginalization:
             sampled_parameters.remove("geocent_time")
