@@ -148,7 +148,11 @@ class RapidAnalysisInput(bilby_pipe.input.Input):
             # Add priors for (ra, dec)
             for k in list(_default_sky_prior.keys()):
                 if k not in list(priors.keys()):
+                    # Consistently update *all* priors
                     priors[k] = _default_sky_prior[k]
+                    single_trigger_likelihood.priors[k] = _default_sky_prior[k]
+                    single_trigger_likelihood_with_cache.priors[k] = _default_sky_prior[k]
+                    single_trigger_result.priors[k] = _default_sky_prior[k]
                 if k not in single_trigger_result.posterior.columns:
                     _generate_sky_frame_parameters = True
 
