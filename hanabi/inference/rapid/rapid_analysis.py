@@ -316,12 +316,6 @@ class ConditionalInference():
         for trigger_idx in self.trigger_ids:
             for p in self.independent_parameters:
                 self.joint_priors[p+self.suffix(trigger_idx)] = copy.deepcopy(self.single_trigger_priors[trigger_idx][p])
-                # Rename the parameter
-                try:
-                    self.joint_priors[p+self.suffix(trigger_idx)].name += self.suffix(trigger_idx)
-                except:
-                    # Fail to rename the parameter, maybe no name was assigned in the first place
-                    pass
                 # LaTeX label
                 try:
                     if self.joint_priors[p+self.suffix(trigger_idx)].latex_label.endswith("$"):
