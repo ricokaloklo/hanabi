@@ -16,6 +16,15 @@ import scipy.integrate
 from gwpopulation.cupy_utils import trapz
 
 class PriorDict(bilby.core.prior.PriorDict):
+    """CPU/GPU-agonstic `PriorDict` object for `bilby`.
+
+    The stock `PriorDict` is mostly CPU/GPU-agnostic except
+    when evaluating the joint probability density, `np.prod`
+    and `np.sum` were used explicitly. This object instead
+    first checks if GPU is enabled and switchs to using
+    `cupy` equivalent when necessary.
+
+    """
     def ln_prob(self, sample, axis=None):
         if _GPU_ENABLED:
             ln_prob = cp.sum(cp.asarray([self[key].ln_prob(sample[key])
@@ -32,8 +41,10 @@ class PriorDict(bilby.core.prior.PriorDict):
         else:
             return super(PriorDict, self).prob(sample, **kwargs)
 
-# This is a much faster (but stripped down) & CPU/GPU-agnostic implementation of Interped in bilby
+
 class Interp(object):
+    """CPU/GPU-agonstic interface for `interp`.
+    """
     def __init__(self, xx, yy):
         self.xx = xx
         self.yy = yy
@@ -42,8 +53,40 @@ class Interp(object):
         return xp.interp(xp.asarray(x), self.xx, self.yy)
 
 class Interped(bilby.core.prior.interpolated.Interped):
+    """CPU/GPU-agnostic implementation of `Interped` prior in `bilby`.
+
+    This is a faster but stripped down implementation. Instead of using
+    `scipy.interpolate.interp1d`, either `numpy` or `cupy` version of
+    the function `interp` is used. The `interp` function assumes that
+    the input `xx` is ordered and this is taken care of internally.
+
+    This class is compatibile with `bilby.core.prior.Interped`.
+
+    """
     def __init__(self, xx, yy, minimum=xp.nan, maximum=xp.nan, name=None,
                  latex_label=None, unit=None, boundary=None):
+        """Create an interpolated prior function from arrays of xx and yy=p(xx).
+
+        Parameters
+        ----------
+        xx : array_like
+            x values for the to be interpolated prior function.
+        yy : array_like
+            p(xx) values for the to be interpolated prior function.
+        minimum : float
+            See superclass.
+        maximum : float
+            See superclass.
+        name : str
+            See superclass.
+        latex_label : str
+            See superclass.
+        unit : str
+            See superclass.
+        boundary : str
+            See superclass.
+
+        """
         self.xx = xp.asarray(xx)
         self.min_limit = float(xp.amin(self.xx))
         self.max_limit = float(xp.amax(self.xx))
@@ -96,6 +139,17 @@ class Interped(bilby.core.prior.interpolated.Interped):
         self.inverse_cumulative_distribution = Interp(self.YY, self.xx)
 
 def cumulative_trapezoid(y, x=None, dx=1.0, axis=-1, initial=None):
+    """CPU/GPU-agnostic implementation of `cumulative_trapezoid`.
+
+    This is using the same algorithm found in
+    `scipy.integrate.cumulative_trapezoid`.
+
+    This is a drop-in replacement of the above function in `scipy`,
+    and share the same interface.
+
+    See the API reference for `scipy.integrate.cumulative_trapezoid`.
+
+    """
     if _GPU_ENABLED:
         y = cp.asarray(y)
         if x is None:
@@ -143,9 +197,27 @@ def cumulative_trapezoid(y, x=None, dx=1.0, axis=-1, initial=None):
         return ctz(y=y, x=x, dx=dx, axis=axis, initial=initial)
 
 def cumtrapz(y, x=None, dx=1.0, axis=-1, initial=None):
+    """CPU/GPU-agnostic implementation of `cumtrapz`.
+
+    Note that this is just `cumulative_trapezoid` with a different name.
+    """
     return cumulative_trapezoid(y=y, x=x, dx=dx, axis=axis, initial=initial)
 
 def logsumexp(x):
+    """CPU/GPU-agnostic implementation of `logsumexp` from `scipy.special`.
+
+    Note that it does not support any of the options for `scipy.special.logsumexp`.
+
+    Parameters
+    ----------
+    x : array_like
+        Input. Could be either a `numpy` or `cupy` array.
+    
+    Returns
+    -------
+    array_like
+        The value of logsumexp of the input.
+    """
     if _GPU_ENABLED:
         # NOTE This is a quick-and-dirty implementation
         # FIXME Should contribute to the cupy codebase
