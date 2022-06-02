@@ -13,7 +13,30 @@ else:
     import numpy as xp
 
 class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
+    """Prior for apparent luminosity distance from prior for absolute magnification.
+
+    This implements basically Eq (19) of arXiv:2104.09339.
+
+    Note that this can also be used as a `Prior` object in `bilby`.
+
+    """
     def __init__(self, abs_magnification_prob_dist, z_src, name=None, latex_label=None, unit=None):
+        """Initialize a `LuminosityDistancePriorFromAbsoluteMagnificationRedshift` object.
+
+        Parameters
+        ----------
+        abs_magnification_prob_dist : Prior
+            The probability distribution of the absolute magnification.
+        z_src : float
+            The source redshift.
+        name : str, optional
+            See superclass.
+        latex_label : str, optional
+            See superclass.
+        unit : str, optional
+            See superclass.
+
+        """
         super(LuminosityDistancePriorFromAbsoluteMagnificationRedshift, self).__init__(
             name=name,
             latex_label=latex_label,
@@ -30,9 +53,30 @@ class LuminosityDistancePriorFromAbsoluteMagnificationRedshift(Prior):
         mu_abs = (self.d_L_src/d_L)**2
         return self.abs_magnification_prob_dist.prob(mu_abs)*self.Jacobian(d_L)
 
-# NOTE This is not a full-blown bilby PriorDict but it does the job!
 class LuminosityDistanceJointPriorFromMagnificationJointDist(object):
+    """Joint prior for apparent luminosity distances from joint prior for absolute magnifications.
+
+    This implements basically Eq (19) of arXiv:2104.09339.
+
+    """
     def __init__(self, magnification_joint_distribution, z_src, sep_char="^", suffix=None):
+        """Initialize a `LuminosityDistanceJointPriorFromMagnificationJointDist` object.
+
+        Parameters
+        ----------
+        magnification_joint_distribution : object
+            The joint probability distribution of the absolute magnifications.
+            It should have at least two methods: `prob` for the probability
+            density, and `ln_prob` for the natural log of the probability
+            density.
+        z_src : float
+            The source redshift.
+        sep_char : str, optional
+            The character used to denote superscript in parameter name.
+        suffix : ParameterSuffix, optional
+            The suffix added to a parameter name indexing the trigger(s).
+
+        """
         self.magnification_joint_distribution = magnification_joint_distribution
         self.z_src = z_src
         # Do redshift -> d_L conversion only once
@@ -61,9 +105,26 @@ class LuminosityDistanceJointPriorFromMagnificationJointDist(object):
     def ln_prob(self, dataset, axis=None):
         return xp.log(self.prob(dataset, axis=axis))
 
-# NOTE This is not a full-blown bilby PriorDict but it does the job!
 class DetectorFrameComponentMassesFromSourceFrame(object):
+    """Joint prior distribution of detector-frame masses from prior in source frame.
+
+    This implements basically Eq (20) of arXiv:2104.09339.
+
+    """
     def __init__(self, mass_src_pop_model, z_src):
+        """Initialize a `DetectorFrameComponentMassesFromSourceFrame` object.
+
+        Parameters
+        ----------
+        mass_src_pop_model : SourcePopulationModel
+            The population model for the sources' component masses.
+            This object should return the probability density when
+            a pandas DataFrame with columns/a dictionary with keys
+            {"mass_1_source", "mass_2_source"} is given.
+        z_src : float
+            The source redshift.
+
+        """
         self.mass_src_pop_model = mass_src_pop_model
         self.z_src = z_src
 
@@ -77,7 +138,56 @@ class DetectorFrameComponentMassesFromSourceFrame(object):
         return xp.log(self.prob(dataset, axis=axis))
 
 class MonteCarloMarginalizedLikelihood(Likelihood):
+    """Likelihood for the hierarchical analysis.
+
+    This implements basically Eq (22) of arXiv:2104.09339
+    as a `Likelihood` object in `bilby`. The implementation
+    is CPU/GPU-agnostic. It will transfer relevant data 
+    to GPU for computation and copy the result back to CPU. 
+
+    Note that the likelihood is a function of the source redshift
+    only, and the `parameters` dictionary should have the key
+    `redshift` set when evaluating the likelihood.
+
+    """
     def __init__(self, result, mass_src_pop_model, spin_src_pop_model, magnification_joint_distribution, sampling_priors=None, sep_char="^", suffix=None, n_samples=None):
+        """Initialize `MonteCarloMarginalizedLikelihood` object.
+
+        Parameters
+        ----------
+        result : Result
+            A `bilby` result file for the parameter estimation done in detector frame.
+        mass_src_pop_model : SourcePopulationModel
+            The population model for the sources' component masses.
+            This object should return the probability density when
+            a pandas DataFrame with columns/a dictionary with keys
+            {"mass_1_source", "mass_2_source"} is given.
+        spin_src_pop_model : SourcePopulationModel
+            The population model for the sources' component spins.
+            This object should return the probability density when
+            a pandas DataFrame with columns/a dictionary with keys
+            {"spin_1x", "spin_1y", "spin_1z",
+             "spin_2x", "spin_2y", "spin_2z"} is given. But currently
+            it is not used here.
+        magnification_joint_distribution : list, object
+            The joint probability distribution of the absolute magnifications.
+            It should have at least two methods: `prob` for the probability
+            density, and `ln_prob` for the natural log of the probability
+            density. If a list is given instead, it will be converted
+            into a compatible `PriorDict` object automatically.
+        sampling_priors : `PriorDict`, optional
+            The joint prior used when performing the parameter estimation
+            given in `result`. If it is not specified, the priors stored
+            in the result object will be used.
+        sep_char : str, optional
+            The character used to denote superscript in parameter name.
+        suffix : ParameterSuffix, optional
+            The suffix added to a parameter name indexing the trigger(s).
+        n_samples : int, optional        
+            Down-sample to use only this many samples. By default,
+            all samples will be used.
+
+        """
         # The likelihood is a function of the source redshift only
         # Might as well do this marginalization deterministically
         super(MonteCarloMarginalizedLikelihood, self).__init__(parameters={'redshift': 0.0})
@@ -152,6 +262,22 @@ class MonteCarloMarginalizedLikelihood(Likelihood):
         return det_frame_priors.ln_prob({p: self.data[p] for p in ["mass_1", "mass_2"]}, axis=0)
 
     def log_likelihood(self):
+        """Evaluate the log likelihood value given a redshift.
+
+        This computes the natural log of Eq (22) in arXiv:2104.09339
+        using Monte-Carlo integration (hence the name of the class).
+        Since the sampling priors used in the parameter estimation
+        for the detector-frame quantities might not be the same
+        as the ones we want to use in the hierarchical analysis,
+        we compute also the appropriate (log) weight and re-weight
+        the log evidence estimate accordingly.
+
+        Returns
+        -------
+        ln_Z : float
+            The natural log of the marginalized likelihood for this redshift.
+
+        """
         z_src = float(self.parameters["redshift"])
         ln_weights = self.compute_ln_prob_for_component_masses(z_src) + \
             self.compute_ln_prob_for_luminosity_distances(z_src) - \
