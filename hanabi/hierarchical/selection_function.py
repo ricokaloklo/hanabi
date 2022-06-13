@@ -218,16 +218,17 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
         self.f = h5py.File(self.filename, "r")
         self.N_inj = self.f.attrs["N_inj"]
         self.N_img = int(self.f.attrs["N_img"])
-        self.fiducial_binaries = self.f["binaries"]
-        self.pdf_mass_fiducial = self.f["binaries"]["pdf_mass"]
-        self.pdf_spin_fiducial = self.f["binaries"]["pdf_spin"]
+        self.fiducial_binaries = self.f["binaries"][:]
+        self.pdf_mass_fiducial = self.f["binaries"]["pdf_mass"][:]
+        self.pdf_spin_fiducial = self.f["binaries"]["pdf_spin"][:]
         self.apparent_dLs = []
         self.pdf_dLs_fiducial = []
         self.predictions = []
         for img in range(self.N_img):
-            self.apparent_dLs.append(self.f["apparent_luminosity_distance_{}".format(img+1)]["d_L"])
-            self.pdf_dLs_fiducial.append(self.f["apparent_luminosity_distance_{}".format(img+1)]["pdf"])
-            self.predictions.append(self.f["predictions_{}".format(img+1)]["prediction"])
+            self.apparent_dLs.append(self.f["apparent_luminosity_distance_{}".format(img+1)]["d_L"][:])
+            self.pdf_dLs_fiducial.append(self.f["apparent_luminosity_distance_{}".format(img+1)]["pdf"][:])
+            self.predictions.append(self.f["predictions_{}".format(img+1)]["prediction"][:])
+        self.f.close()
 
     def evaluate(self):
         self.load_from_file()
@@ -296,7 +297,6 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
 
         beta = np.sum(epsilons).astype(float)/self.N_z
 
-        self.f.close()
         return beta
 
 class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
@@ -424,12 +424,13 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
         logger.info(f"Reading from file {self.filename}")
         self.f = h5py.File(self.filename, "r")
         self.N_inj = self.f.attrs["N_inj"]
-        self.fiducial_binaries = self.f["binaries"]
-        self.pdf_mass_fiducial = self.f["binaries"]["pdf_mass"]
-        self.pdf_spin_fiducial = self.f["binaries"]["pdf_spin"]
-        self.fiducial_z = self.f["redshifts"]["z"]
-        self.pdf_z_fiducial = self.f["redshifts"]["pdf"]
-        self.predictions = self.f["predictions"]["prediction"]
+        self.fiducial_binaries = self.f["binaries"][:]
+        self.pdf_mass_fiducial = self.f["binaries"]["pdf_mass"][:]
+        self.pdf_spin_fiducial = self.f["binaries"]["pdf_spin"][:]
+        self.fiducial_z = self.f["redshifts"]["z"][:]
+        self.pdf_z_fiducial = self.f["redshifts"]["pdf"][:]
+        self.predictions = self.f["predictions"]["prediction"][:]
+        self.f.close()
 
     def evaluate(self):
         self.load_from_file()
@@ -482,7 +483,6 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
         predictions = xp.asarray(self.predictions)
         alpha = xp.sum(predictions*weights_source*weights_z).astype(float)/(float(self.N_inj))
 
-        self.f.close()
         # NOTE If using numpy, alpha is a scalar but if using cupy, alpha is a 0-d array
         return float(alpha)
 
