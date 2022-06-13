@@ -230,7 +230,7 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
             self.predictions.append(self.f["predictions_{}".format(img+1)]["prediction"][:])
         self.f.close()
 
-    def evaluate(self, estimate_uncertainty=False, enable_tqdm=True):
+    def evaluate(self, estimate_uncertainty=False):
         self.load_from_file()
         m1 = self.fiducial_binaries["mass_1"]
         m2 = self.fiducial_binaries["mass_2"]
@@ -302,7 +302,7 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
             import cupy as cp
             zs = cp.asnumpy(zs)
         epsilons = []
-        for z in tqdm.tqdm(zs, disable=not enable_tqdm):
+        for z in tqdm.tqdm(zs):
             epsilons.append(epsilon(z, estimate_uncertainty=estimate_uncertainty))
 
         if estimate_uncertainty:
