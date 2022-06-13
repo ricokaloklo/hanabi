@@ -230,7 +230,7 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
             self.predictions.append(self.f["predictions_{}".format(img+1)]["prediction"][:])
         self.f.close()
 
-    def evaluate(self):
+    def evaluate(self, estimate_uncertainty=False, enable_tqdm=True):
         self.load_from_file()
         m1 = self.fiducial_binaries["mass_1"]
         m2 = self.fiducial_binaries["mass_2"]
@@ -268,7 +268,7 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
             self.pdf_dLs_fiducial[img] = xp.asarray(self.pdf_dLs_fiducial[img])
             self.apparent_dLs[img] = xp.asarray(self.apparent_dLs[img])
 
-        def epsilon(z_src):
+        def epsilon(z_src, estimate_uncertainty=False):
             det_mass_pop_dist = DetectorFrameComponentMassesFromSourceFrame(self.mass_src_pop_model, z_src)
             pdf_mass_pop = det_mass_pop_dist.prob({"mass_1": m1, "mass_2": m2})
             weights_mass = pdf_mass_pop/pdf_mass_fiducial
@@ -282,7 +282,17 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
                 weights_dL = pdf_dL_pop/pdf_dL_fiducial
                 integrand *= self.predictions[img]*weights_dL
 
-            return float(xp.sum(integrand)/float(self.N_inj))
+            eps = float(xp.sum(integrand)/float(self.N_inj))
+
+            if estimate_uncertainty:
+                # This is Eq. 9 from arXiv:1904.10879
+                mu = eps
+                # Note that the array stored in predictions is actually just identity
+                sigma_sq = xp.sum(integrand**2).astype(float)/(float(self.N_inj)**2) - mu**2/float(self.N_inj)
+
+                return eps, float(xp.sqrt(sigma_sq))
+            else:
+                return eps
 
         logger = logging.getLogger(__prog__)
         logger.info("Integrating over source redshift")
@@ -292,12 +302,23 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
             import cupy as cp
             zs = cp.asnumpy(zs)
         epsilons = []
-        for z in tqdm.tqdm(zs):
-            epsilons.append(epsilon(z))
+        for z in tqdm.tqdm(zs, disable=not enable_tqdm):
+            epsilons.append(epsilon(z, estimate_uncertainty=estimate_uncertainty))
 
-        beta = np.sum(epsilons).astype(float)/self.N_z
+        if estimate_uncertainty:
+            eps, eps_sigma = zip(*epsilons)
+            eps = np.array(eps)
+            eps_sigma = np.array(eps_sigma)
+        else:
+            eps = np.array(epsilons)
 
-        return beta
+        beta = np.sum(eps).astype(float)/self.N_z
+        if estimate_uncertainty:
+            # Since beta = 1/N_z \sum eps(z)
+            # Var(beta) = (1/N_z)**2 \sum Var(eps(z))
+            return beta, np.sqrt(np.sum(eps_sigma**2)/(self.N_z**2))
+        else:
+            return beta
 
 class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
     def __init__(
