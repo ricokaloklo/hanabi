@@ -432,7 +432,7 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
         self.predictions = self.f["predictions"]["prediction"][:]
         self.f.close()
 
-    def evaluate(self):
+    def evaluate(self, estimate_uncertainty=False):
         self.load_from_file()
 
         # Perform MC reweighting
@@ -482,9 +482,17 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
 
         predictions = xp.asarray(self.predictions)
         alpha = xp.sum(predictions*weights_source*weights_z).astype(float)/(float(self.N_inj))
-
         # NOTE If using numpy, alpha is a scalar but if using cupy, alpha is a 0-d array
-        return float(alpha)
+        alpha = float(alpha)
+
+        if estimate_uncertainty:
+            # This is Eq. 9 from arXiv:1904.10879
+            mu = alpha
+            sigma_sq = xp.sum(predictions*(weights_source*weights_z)**2).astype(float)/(float(self.N_inj)**2) - mu**2/float(self.N_inj)
+
+            return alpha, float(xp.sqrt(sigma_sq))
+        else:
+            return alpha
 
 class BinaryBlackHoleSelectionFunctionFromInjection(SelectionFunction):
     def __init__(
