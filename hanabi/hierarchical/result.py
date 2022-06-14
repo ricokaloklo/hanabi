@@ -19,25 +19,55 @@ def compute_source_parameters(joint_samples):
         joint_samples[p.replace("luminosity_distance", "magnification")] = (bilby.gw.conversion.redshift_to_luminosity_distance(joint_samples["redshift"])/joint_samples[p])**2
         joint_samples[p.replace("luminosity_distance", "relative_magnification")] = joint_samples[p.replace("luminosity_distance", "magnification")]/joint_samples[dL_names[0].replace("luminosity_distance", "magnification")]
 
-def compute_log_coherence_ratio(joint_result, *single_result):
+def compute_log_coherence_ratio(joint_result, *single_result, estimate_uncertainty=False):
     joint_log_evidence = joint_result.log_evidence
     if isinstance(list(single_result)[0], ReweightWithPopulationModel):
         # Need to compute the reweighted log evidence
-        return joint_log_evidence - np.sum([r.reweight_ln_evidence() for r in list(single_result)])
+        log_coherence_ratio = joint_log_evidence - np.sum([r.reweight_ln_evidence() for r in list(single_result)])
+        if estimate_uncertainty:
+            log_coherence_ratio_err = np.sqrt(joint_result.log_evidence_err**2 + np.sum([r.reweight_ln_evidence(estimate_uncertainty=True)[1]**2 for r in list(single_result)]))
+            return log_coherence_ratio, log_coherence_ratio_err
+        else:
+            return log_coherence_ratio
     else:
-        return joint_log_evidence - np.sum([r.log_evidence for r in list(single_result)])
+        log_coherence_ratio = joint_log_evidence - np.sum([r.log_evidence for r in list(single_result)])
+        if estimate_uncertainty:
+            log_coherence_ratio_err = np.sqrt(joint_result.log_evidence_err**2 + np.sum([r.log_evidence_err**2 for r in list(single_result)]))
+            return log_coherence_ratio, log_coherence_ratio_err
+        else:
+            return log_coherence_ratio
 
-def compute_log_Bayes_factor(selection_function_hdf5_file, joint_result, *single_result):
+def compute_log_Bayes_factor(selection_function_hdf5_file, joint_result, *single_result, estimate_uncertainty=False):
     with h5py.File(selection_function_hdf5_file, "r") as f:
         alpha = f.attrs["alpha"]
         beta = f.attrs["beta"]
-    
+
+        try:
+            alpha_err = f.attrs["alpha_err"]
+            beta_err = f.attrs["beta_err"]
+        except:
+            # Assume zero uncertainty if not found
+            alpha_err = 0.0
+            beta_err = 0.0
+
+    # log_alpha_err = d(log alpha)/d(alpha) alpha_err
+    # log_alpha_err = 1/alpha * alpha_err
+    # and similarly for log_beta_err
+    log_alpha_err = (1./alpha) * alpha_err
+    log_beta_err = (1./beta) * beta_err
+
     log_alphaN_over_beta = np.log(alpha**len(list(single_result))/beta)
     log_coherence_ratio = compute_log_coherence_ratio(joint_result, *single_result)
+    log_Bayes_factor = log_alphaN_over_beta + log_coherence_ratio
 
-    return log_alphaN_over_beta + log_coherence_ratio
+    if estimate_uncertainty:
+        log_alphaN_over_beta_err = np.sqrt((len(list(single_result))**2 * log_alpha_err**2) + log_beta_err**2)
+        _, log_coherence_ratio_err = compute_log_coherence_ratio(joint_result, *single_result, estimate_uncertainty=True)
+        return log_Bayes_factor, np.sqrt(log_alphaN_over_beta_err**2 + log_coherence_ratio_err**2)
+    else:
+        return log_Bayes_factor
 
-def save_hierarchical_analysis_result(log_Bayes_factor, log_coherence_ratio, joint_samples, label, outdir="."):
+def save_hierarchical_analysis_result(log_Bayes_factor, log_coherence_ratio, joint_samples, label, outdir=".", log_Bayes_factor_err=np.nan):
     output_filename = os.path.join(os.path.abspath(outdir), "{}.h5".format(label))
     f = h5py.File(output_filename, "w")
     output_samples = joint_samples.drop(columns=['log_prior']).to_dict(orient='list')
@@ -46,6 +76,7 @@ def save_hierarchical_analysis_result(log_Bayes_factor, log_coherence_ratio, joi
     output_samples = np.rec.fromarrays(list(output_samples.values()), dtype=output_samples_dt)
     f.create_dataset("posterior_samples", data=output_samples)
     f.attrs["log_Bayes_factor"] = log_Bayes_factor
+    f.attrs["log_Bayes_factor_err"] = np.nan_to_num(log_Bayes_factor_err)
     f.attrs["log_coherence_ratio"] = log_coherence_ratio
     f.close()
 

@@ -7,6 +7,8 @@ from pathlib import Path
 import inspect
 import pickle
 from importlib import import_module
+import numpy as np
+from scipy.special import logsumexp
 
 from bilby.gw.likelihood import GravitationalWaveTransient
 from .._version import __version__
@@ -25,6 +27,95 @@ def turn_off_forbidden_option(input, forbidden_option, prog):
         logger.info(f"Turning off {forbidden_option}")
         setattr(input, forbidden_option, False)
 
+def estimate_effective_sample_size(log_weights):
+    """
+        An estimate of effective sample size (ESS)
+        is given by 
+
+        N_ESS = (\sum(w_i))^2 / \sum(w_i^2)
+
+        Therefore
+        log(N_ESS) = log(\sum(w_i)^2) - log(\sum(w_i^2))
+        = 2 log(\sum(w_i)) - log(\sum(w_i^2))
+
+        The first term log(\sum(w_i)) can be computed
+        using the stock logsumexp special function
+        as log(\sum(exp(log(w_i))))
+
+        The second term log(\sum(w_i^2)) can be written as
+        log(\sum(exp(log(w_i^2))))
+        = log(\sim(exp(2 log(w_i))))
+    """
+    log_N_ESS = 2*logsumexp(log_weights) - logsumexp(2*log_weights)
+    return np.exp(log_N_ESS)
+
+def reweight_log_evidence(log_base_evidence, log_weights):
+    return log_base_evidence + logsumexp(log_weights) - np.log(len(log_weights))
+
+def estimate_reweighted_log_evidence_err(log_base_evidence, log_base_evidence_err, log_weights):
+    """
+        An estimate of the variance is given in
+        Monte Carlo Statistical Methods (2004) as
+
+        var = 1/(N*N_ESS) * \sum(f(x) - fbar)^2
+        = 1/N_ESS * 1/N \sum(f(x) - fbar)^2
+        = 1/N_ESS * Var(f(x))
+        = 1/N_ESS * (<f^2> - <f>^2)
+
+        Note that the reweighted evidence is given by
+        Z_reweighted = Z_base 1/N * \sum_i (p_new_i/p_old_i)
+        = Z_base 1/N * \sum(w_i)
+        = Z_base <w_i>
+        = Z_base fbar
+        => Z_reweighted/Z_base = fbar
+        where we define f(x) = p_new/p_old = w_i
+
+        Therefore log Z_reweighted is given by
+        log Z_reweighted = log Z_base + log(\sum(exp(log_weights))) - log(N)
+
+        and the log variance of the ratio Z_reweighted/Z_base is
+        log(var) = -log(N_ESS) + log(<f^2> - <f>^2)
+        = -log(N_ESS) + log(<w_i^2> - <w_i>^2)
+    """
+    N = len(log_weights)
+    N_ESS = estimate_effective_sample_size(log_weights)
+    log_ratio = reweight_log_evidence(log_base_evidence, log_weights) - log_base_evidence
+    """
+        log(<w_i^2>)
+        = log(1/N \sum (w_i^2))
+        = -log N + log(\sum(w_i^2))
+    """
+    log_avg_sq_sum = logsumexp(2*log_weights) - np.log(N)
+    """
+        log(<w_i>)
+        = log(1/N \sum w_i)
+        = -log N + log(\sum w_i)
+    """
+    log_avg_sum = logsumexp(log_weights) - np.log(N)
+    """
+        log(<w_i^2> - <w_i>^2)
+        = log(exp(log(<w_i^2>)) - exp(log(<w_i>^2)))
+        = log(exp(log(<w_i^2>)) - exp(2log(<w_i>)))
+    """
+    # This is the *log* of variance of the ratio
+    log_ratio_var = -np.log(N_ESS) + logsumexp([log_avg_sq_sum, 2*log_avg_sum], b=[1, -1])
+    
+    """
+        Now compute the error of the *log of the ratio*
+        err of log_ratio = d(log_ratio)/d(ratio) ratio_err
+        = 1/ratio * ratio_err
+        => log(err of log ratio) = -log(ratio) + log(ratio_err)
+    """
+    log_log_ratio_err = -log_ratio + 0.5*log_ratio_var
+    log_ratio_err = np.exp(log_log_ratio_err)
+
+    """
+        Since log Z_reweighted = log(Z_reweighted/Z_base * Z_base)
+        = log(Z_base) + log(ratio)
+        Therefore
+        log Z_reweighted err^2 = log Z_base_err^2 + log_ratio_err^2
+    """
+    return np.sqrt(log_base_evidence_err**2 + log_ratio_err**2)
 
 def write_complete_config_file(parser, args, inputs, prog):
     args_dict = vars(args).copy()

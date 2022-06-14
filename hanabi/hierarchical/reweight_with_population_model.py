@@ -7,6 +7,7 @@ from bilby.core.prior import Prior
 from .utils import get_ln_weights_for_reweighting, downsample, setup_logger
 from .cupy_utils import _GPU_ENABLED, PriorDict
 from .marginalized_likelihood import DetectorFrameComponentMassesFromSourceFrame
+from ..inference.utils import reweight_log_evidence, estimate_reweighted_log_evidence_err
 
 class LuminosityDistancePriorFromRedshift(Prior):
     def __init__(self, z_src_prob_dist, cosmo=Planck15, name=None, latex_label=None, unit='Mpc'):
@@ -104,9 +105,14 @@ class ReweightWithPopulationModel(object):
             ln_weights = cp.asnumpy(ln_weights)
         return ln_weights
 
-    def reweight_ln_evidence(self):
-        ln_Z = self.result.log_evidence + logsumexp(self.ln_weights) - np.log(len(self.ln_weights))
-        return ln_Z
+    def reweight_ln_evidence(self, estimate_uncertainty=False):
+        reweighted_ln_evidence = reweight_log_evidence(self.result.log_evidence, self.ln_weights)
+
+        if estimate_uncertainty:
+            reweighted_ln_evidence_err = estimate_reweighted_log_evidence_err(self.result.log_evidence, self.result.log_evidence_err, self.ln_weights)
+            return reweighted_ln_evidence, reweighted_ln_evidence_err
+        else:
+            return reweighted_ln_evidence
 
     def reweight_samples(self):
         reweighted_samples = bilby.result.rejection_sample(self.result.posterior.iloc[self.keep_idxs], np.exp(self.ln_weights))
