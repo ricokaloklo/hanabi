@@ -55,7 +55,7 @@ def reweight_log_evidence(log_base_evidence, log_weights):
 def estimate_reweighted_log_evidence_err(log_base_evidence, log_base_evidence_err, log_weights):
     """
         An estimate of the variance is given in
-        Monte Carlo Statistical Methods (2004) as
+        Monte Carlo Statistical Methods (2004) pg 500 as
 
         var = 1/(N*N_ESS) * \sum(f(x) - fbar)^2
         = 1/N_ESS * 1/N \sum(f(x) - fbar)^2
@@ -98,7 +98,7 @@ def estimate_reweighted_log_evidence_err(log_base_evidence, log_base_evidence_er
         = log(exp(log(<w_i^2>)) - exp(2log(<w_i>)))
     """
     # This is the *log* of variance of the ratio
-    log_ratio_var = -np.log(N_ESS) + logsumexp([log_avg_sq_sum, 2*log_avg_sum], b=[1, -1])
+    ratio_log_var = -np.log(N_ESS) + logsumexp([log_avg_sq_sum, 2*log_avg_sum], b=[1, -1])
     
     """
         Now compute the error of the *log of the ratio*
@@ -106,8 +106,8 @@ def estimate_reweighted_log_evidence_err(log_base_evidence, log_base_evidence_er
         = 1/ratio * ratio_err
         => log(err of log ratio) = -log(ratio) + log(ratio_err)
     """
-    log_log_ratio_err = -log_ratio + 0.5*log_ratio_var
-    log_ratio_err = np.exp(log_log_ratio_err)
+    log_ratio_log_err = -log_ratio + 0.5*ratio_log_var
+    log_ratio_err = np.exp(log_ratio_log_err)
 
     """
         Since log Z_reweighted = log(Z_reweighted/Z_base * Z_base)
