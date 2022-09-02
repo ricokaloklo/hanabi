@@ -448,6 +448,11 @@ class ConditionalInference():
             sampled_parameters.remove("geocent_time")
         if self.likelihood_base_with_cache.distance_marginalization:
             sampled_parameters.remove("luminosity_distance")
+        
+        # Remove parameters with Dirac-Delta prior
+        for p in self.single_trigger_results[self.trigger_ids[0]].fixed_parameter_keys:
+            if "image_type" not in p:
+                sampled_parameters.remove(p)
 
         # FIXME Check if there is anything to sample. If there is none, use the special method
         if sampled_parameters == ["image_type"]:
@@ -482,6 +487,26 @@ class ConditionalInference():
         self.joint_parameter_keys = list(samples.columns)
         log_Z_conditioned = np.array(log_Z_conditioned)
         self.log_joint_evidence = compute_log_joint_evidence_from_log_conditional_evidence(self.single_trigger_results[self.trigger_ids[0]].log_evidence, log_Z_conditioned)
+
+        # Estimate error
+        log_weights = log_Z_conditioned
+        N = len(log_weights)
+        log_N_ESS = 2*logsumexp(log_weights) - logsumexp(2*log_weights)
+        N_ESS = np.exp(log_N_ESS)
+        # Report
+        print("N: {}, N_ESS: {}".format(N, N_ESS))
+
+        log_ratio = logsumexp(log_weights) - np.log(N)
+        log_avg_sq_sum = logsumexp(2*log_weights) - np.log(N)
+        log_avg_sum = logsumexp(log_weights) - np.log(N)
+        ratio_log_var = -np.log(N_ESS) + logsumexp([log_avg_sq_sum, 2*log_avg_sum], b=[1, -1])
+        log_ratio_log_err = -log_ratio + 0.5*ratio_log_var
+        log_ratio_err = np.exp(log_ratio_log_err)
+        # Report
+        print("Error on log Z_joint/Z_base: {}".format(log_ratio_err))
+        log_base_evidence_err = self.single_trigger_results[self.trigger_ids[0]].log_evidence_err
+        print("Error on log Z_joint: {}".format(np.sqrt(log_base_evidence_err**2 + log_ratio_err**2)))
+
         self.log_joint_evidence_err = estimate_uncertainty(self.single_trigger_results[self.trigger_ids[0]].log_evidence_err, log_Z_conditioned)
         self.log_joint_noise_evidence = np.sum([r.log_noise_evidence for r in self.single_trigger_results])
         self.log_bayes_factor = self.log_joint_evidence-self.log_joint_noise_evidence
