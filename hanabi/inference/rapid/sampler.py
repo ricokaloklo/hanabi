@@ -3,6 +3,7 @@ import pandas as pd
 import copy
 import itertools
 from scipy.special import logsumexp
+import bilby
 
 def sample_time_dist_marginalized(
         theta,
@@ -115,6 +116,11 @@ def generate_all_parameters(
                     'geocent_time': ref_geocent_time,
                 }
             )
+            # Fill in parameters that are fixed
+            for k, prior in single_trigger_priors[trigger_idx].items():
+                if type(prior) is bilby.core.prior.DeltaFunction:
+                    single_trigger_likelihoods_with_cache[trigger_idx].parameters.update({k: prior.sample()})
+            
             joint_log_L += single_trigger_likelihoods_with_cache[trigger_idx].log_likelihood()
             joint_log_prior += lensing_prior_dict["image_type"+suffix(trigger_idx)].ln_prob(it_type_combo[trigger_idx])
 
