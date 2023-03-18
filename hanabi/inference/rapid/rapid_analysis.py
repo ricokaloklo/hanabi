@@ -449,10 +449,11 @@ class ConditionalInference():
         if self.likelihood_base_with_cache.distance_marginalization:
             sampled_parameters.remove("luminosity_distance")
         
-        # Remove parameters with Dirac-Delta prior
-        for p in self.single_trigger_results[self.trigger_ids[0]].fixed_parameter_keys:
-            if "image_type" not in p:
-                sampled_parameters.remove(p)
+        # Remove parameters with Dirac-Delta prior if there is one
+        if self.single_trigger_results[self.trigger_ids[0]].fixed_parameter_keys is not None:
+            for p in self.single_trigger_results[self.trigger_ids[0]].fixed_parameter_keys:
+                if p != "image_type" and p in sampled_parameters:
+                    sampled_parameters.remove(p)
 
         # FIXME Check if there is anything to sample. If there is none, use the special method
         if sampled_parameters == ["image_type"]:
