@@ -54,7 +54,7 @@ setuptools.setup(
     author="Rico Ka Lok Lo, Ignacio Magana",
     author_email="kllo@caltech.edu",
     description="Hierarchical bayesian ANAlysis on lensed GW signals using BIlby",
-    long_description="LONG DESCRIPTION HERE",
+    long_description="Identify and characterize strongly-lensed gravitational waves",
     url="https://git.ligo.org/ka-lok.lo/hanabi",
     packages=[
         "hanabi",
