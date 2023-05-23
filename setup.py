@@ -82,10 +82,10 @@ setuptools.setup(
         ]
     },
     install_requires=[
-        "bilby>=1.0.2",
-        "bilby_pipe>=1.0.2",
+        "bilby>=2.0.1",
+        "bilby_pipe>=1.0.8",
         "gwpopulation",
-        "parallel_bilby>=0.1.5",
+        "parallel_bilby>=2.0.2",
         "mpi4py",
         "configargparse==1.4",
     ],
