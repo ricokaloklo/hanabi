@@ -98,29 +98,6 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         else:
             self._common_parameters = []
 
-    @property
-    def sampling_seed(self):
-        return self._samplng_seed
-
-    @sampling_seed.setter
-    def sampling_seed(self, sampling_seed):
-        if sampling_seed is None:
-            sampling_seed = np.random.randint(1, 1e6)
-        self._samplng_seed = sampling_seed
-        np.random.seed(sampling_seed)
-        logger = logging.getLogger(__prog__)
-        logger.info(f"Sampling seed set to {sampling_seed}")
-
-        if self.sampler == "cpnest":
-            self.sampler_kwargs["seed"] = self.sampler_kwargs.get(
-                "seed", self._samplng_seed
-            )
-
-    @property
-    def result_directory(self):
-        result_dir = os.path.join(self.outdir, "result")
-        return os.path.relpath(result_dir)
-
     @staticmethod
     def _check_consistency_between_data_analysis_inputs(single_trigger_pe_inputs, arguments_to_check):
         for arg in arguments_to_check:

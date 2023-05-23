@@ -6,11 +6,7 @@ from bilby_pipe.parser import StoreBoolean
 from bilby_pipe.utils import nonestr, nonefloat, noneint
 import argparse
 import logging
-from parallel_bilby.parser import (
-    _add_dynesty_settings_to_parser,
-    _add_slurm_settings_to_parser,
-    _add_misc_settings_to_parser,
-)
+from parallel_bilby.parser.generation import _add_slurm_settings_to_parser
 
 def purge_empty_argument_group(parser):
     non_empty_action_groups = []
@@ -66,44 +62,35 @@ def _create_base_parser(prog, prog_version):
 
     return base_parser
 
+def _list_arguments_in_group_by_title(parser, group_tilte):
+    # Go through the list of _action_groups in parser, look for group with the given title
+    # NOTE The first element in _action_groups is for positional arguments
+    # and the second element is for options that are not in any particular group
+    # such as --version and --help
+    arguments_to_remove = []
+
+    for group in parser._action_groups[2:]:
+        if group.title == group_tilte:
+            for action in group._group_actions:
+                arguments_to_remove.append(action.option_strings[-1][2:])
+
+    return arguments_to_remove
+
 def _remove_arguments_from_bilby_pipe_parser_for_hanabi(bilby_pipe_parser, prog):
-    bilby_pipe_arguments_to_keep = [
-        "ini",
-        "help",
-        "verbose",
-        "sampler",
-        "sampling-seed",
-        "n-parallel",
-        "sampler-kwargs",
-        "accounting",
-        "label",
-        "local",
-        "local-generation",
-        "outdir",
-        "periodic-restart-time",
-        "request-memory",
-        "request-memory-generation",
-        "request-cpus",
-        "singularity-image",
-        "scheduler",
-        "scheduler-args",
-        "scheduler-module",
-        "scheduler-env",
-        "scheduler-analysis-time",
-        "submit",
-        "condor-job-priority",
-        "transfer-files",
-        "log-directory",
-        "online-pe",
-        "osg",
-        "single-postprocessing-executable",
-        "single-postprocessing-arguments",
-        "create-summary",
-        "notification",
-        "email",
+    bilby_pipe_arguments_remove = [
+        'version',
     ]
 
-    keep_arguments_from_parser(bilby_pipe_parser, bilby_pipe_arguments_to_keep, prog)
+    # These arguments are removed from hanabi_joint_pipe because they should be handled for each trigger
+    bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Calibration arguments')
+    bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Data generation arguments')
+    bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Detector arguments')
+    bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Injection arguments')
+    bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Likelihood arguments')
+    bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Prior arguments')
+    bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Waveform arguments')
+
+    remove_arguments_from_parser(bilby_pipe_parser, bilby_pipe_arguments_remove, prog)
 
     return bilby_pipe_parser
 
@@ -271,9 +258,7 @@ def create_joint_generation_pbilby_parser(prog, prog_version):
         parents=[base_parser, bilby_pipe_parser]       
     )
 
-    joint_generation_pbilby_parser = _add_dynesty_settings_to_parser(joint_generation_pbilby_parser)
     joint_generation_pbilby_parser = _add_slurm_settings_to_parser(joint_generation_pbilby_parser)
-    joint_generation_pbilby_parser = _add_misc_settings_to_parser(joint_generation_pbilby_parser)
     joint_generation_pbilby_parser = _add_hanabi_settings_to_parser(joint_generation_pbilby_parser)
 
     purge_empty_argument_group(joint_generation_pbilby_parser)
