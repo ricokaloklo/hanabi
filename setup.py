@@ -90,10 +90,9 @@ setuptools.setup(
         "configargparse==1.4",
     ],
     classifiers=[
-        "Programming Language :: Python :: 3.6",
-        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Operating System :: MacOS :: MacOS X",
         "Operating System :: POSIX",
     ],
-    python_requires='>=3.6',
+    python_requires='>=3.8',
 )
