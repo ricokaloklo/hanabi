@@ -6,7 +6,14 @@ from bilby_pipe.parser import StoreBoolean
 from bilby_pipe.utils import nonestr, nonefloat, noneint
 import argparse
 import logging
-from parallel_bilby.parser.generation import _add_slurm_settings_to_parser
+from parallel_bilby.parser.generation import (
+    _add_slurm_settings_to_parser,
+    _create_reduced_bilby_pipe_parser,
+)
+from parallel_bilby.parser.shared import (
+    _add_dynesty_settings_to_parser,
+    _add_misc_settings_to_parser,
+)
 
 def purge_empty_argument_group(parser):
     non_empty_action_groups = []
@@ -91,52 +98,6 @@ def _remove_arguments_from_bilby_pipe_parser_for_hanabi(bilby_pipe_parser, prog)
     bilby_pipe_arguments_remove += _list_arguments_in_group_by_title(bilby_pipe_parser, 'Waveform arguments')
 
     remove_arguments_from_parser(bilby_pipe_parser, bilby_pipe_arguments_remove, prog)
-
-    return bilby_pipe_parser
-
-def _remove_arguments_from_bilby_pipe_parser_for_pbilby(bilby_pipe_parser, prog):
-    bilby_pipe_arguments_to_ignore = [
-        "version",
-        "accounting",
-        "local",
-        "local-generation",
-        "local-plot",
-        "request-memory",
-        "request-memory-generation",
-        "request-cpus",
-        "singularity-image",
-        "scheduler",
-        "scheduler-args",
-        "scheduler-module",
-        "scheduler-env",
-        "condor-job-priority",
-        "periodic-restart-time",
-        "transfer-files",
-        "online-pe",
-        "osg",
-        "email",
-        "postprocessing-executable",
-        "postprocessing-arguments",
-        "sampler",
-        "sampling-seed",
-        "sampler-kwargs",
-        "plot-calibration",
-        "plot-corner",
-        "plot-format",
-        "plot-marginal",
-        "plot-skymap",
-        "plot-waveform",
-    ]
-
-    remove_arguments_from_parser(bilby_pipe_parser, bilby_pipe_arguments_to_ignore, prog)
-
-    bilby_pipe_parser.add_argument(
-        "--sampler",
-        choices=["dynesty"],
-        default="dynesty",
-        type=str,
-        help="The parallelised sampler to use, defaults to dynesty",
-    )
 
     return bilby_pipe_parser
 
@@ -243,9 +204,7 @@ def create_joint_analysis_parser(prog, prog_version):
 
 def create_joint_generation_pbilby_parser(prog, prog_version):
     base_parser = _create_base_parser(prog, prog_version)
-    bilby_pipe_parser = _remove_arguments_from_bilby_pipe_parser_for_pbilby(
-        bilby_pipe.parser.create_parser(), prog
-    )
+    bilby_pipe_parser = _create_reduced_bilby_pipe_parser()
     bilby_pipe_parser = _remove_arguments_from_bilby_pipe_parser_for_hanabi(
         bilby_pipe_parser, prog
     )
@@ -259,6 +218,8 @@ def create_joint_generation_pbilby_parser(prog, prog_version):
     )
 
     joint_generation_pbilby_parser = _add_slurm_settings_to_parser(joint_generation_pbilby_parser)
+    joint_generation_pbilby_parser = _add_misc_settings_to_parser(joint_generation_pbilby_parser)
+    joint_generation_pbilby_parser = _add_dynesty_settings_to_parser(joint_generation_pbilby_parser)
     joint_generation_pbilby_parser = _add_hanabi_settings_to_parser(joint_generation_pbilby_parser)
 
     purge_empty_argument_group(joint_generation_pbilby_parser)

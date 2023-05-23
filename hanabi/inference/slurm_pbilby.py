@@ -1,9 +1,8 @@
 from os.path import abspath
 from .parser import create_joint_analysis_pbilby_parser
-from parallel_bilby.utils import get_cli_args
+
 import parallel_bilby
-from parallel_bilby.slurm import (
-    setup_submit,
+from parallel_bilby.slurm.slurm import (
     BaseNode,
     MergeNodes,
 )
@@ -45,7 +44,7 @@ def setup_submit(data_dump_files, inputs, args):
 
 
 
-class AnalysisNode(parallel_bilby.slurm.AnalysisNode):
+class AnalysisNode(parallel_bilby.slurm.slurm.AnalysisNode):
     def __init__(self, data_dump_files, inputs, idx, args):
         self.data_dump_files = data_dump_files
         self.inputs = inputs
@@ -78,7 +77,7 @@ class AnalysisNode(parallel_bilby.slurm.AnalysisNode):
         run_list = [self.inputs.complete_ini_file]
         run_list += ["--data-dump-files {}".format(data_dump_file) for data_dump_file in self.data_dump_files]
         run_list.append("--label {}".format(self.label))
-        run_list.append("--outdir {}".format(abspath(self.inputs.result_directory)))
+        run_list.append("--outdir {}".format(self.inputs.result_directory))
         run_list.append(
             "--sampling-seed {}".format(self.inputs.sampling_seed + self.idx)
         )

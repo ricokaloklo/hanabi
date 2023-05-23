@@ -4,6 +4,8 @@ import subprocess
 import copy
 import logging
 import bilby_pipe
+import numpy as np
+
 from parallel_bilby.utils import get_cli_args
 from parallel_bilby.parser import create_generation_parser
 from .parser import create_joint_generation_pbilby_parser
@@ -30,6 +32,17 @@ class JointGenerationPBilbyInput(bilby_pipe.input.Input):
 
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
+
+    @property
+    def sampling_seed(self):
+        return self._samplng_seed
+
+    @sampling_seed.setter
+    def sampling_seed(self, sampling_seed):
+        if sampling_seed is None:
+            sampling_seed = np.random.randint(1, 1e6)
+        self._samplng_seed = sampling_seed
+        np.random.seed(sampling_seed)
 
 
 def generate_single_trigger_pe_data_dump_files(joint_generation_input):
