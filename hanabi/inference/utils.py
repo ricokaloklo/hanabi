@@ -11,6 +11,8 @@ from importlib import import_module
 from bilby.gw.likelihood import GravitationalWaveTransient
 from .._version import __version__
 
+_dist_marg_lookup_table_filename_template = ".distance_marginalization_lookup_trigger_{}.npz"
+
 class ParameterSuffix(object):
     def __init__(self, sep_char="^"):
         self.sep_char = sep_char

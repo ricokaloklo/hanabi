@@ -42,7 +42,7 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
         self.single_trigger_args = []
 
         # Loop over data dump files to construct the priors and likelihoods from single triggers
-        for data_dump_file in self.data_dump_files:
+        for idx, data_dump_file in enumerate(self.data_dump_files):
             with open(data_dump_file, "rb") as f:
                 data_dump = pickle.load(f)
                 ifo_list = data_dump["ifo_list"]
@@ -58,6 +58,7 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
                     priors=priors,
                     args=args,
                 )
+                likelihood # Making sure that all the pre-computations are done!
                 self.single_trigger_likelihoods.append(likelihood)
                 self.single_trigger_priors.append(priors)
 

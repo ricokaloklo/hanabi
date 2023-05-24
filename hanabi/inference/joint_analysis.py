@@ -23,7 +23,7 @@ from ..lensing.conversion import convert_to_lal_binary_black_hole_parameters_for
 # Lensing likelihood
 import hanabi.lensing.likelihood
 from .utils import setup_logger
-from .utils import ParameterSuffix
+from .utils import ParameterSuffix, _dist_marg_lookup_table_filename_template
 from .parser import create_joint_analysis_parser
 
 from .utils import get_version_information
@@ -113,9 +113,14 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
 
         logger = logging.getLogger(__prog__)
 
-        for complete_trigger_ini_file, data_dump_file in zip(self.trigger_ini_files, self.data_dump_files):
+        for idx, (complete_trigger_ini_file, data_dump_file) in enumerate(zip(self.trigger_ini_files, self.data_dump_files)):
             logger.info(f"Parsing config ini file {complete_trigger_ini_file}")
             args, unknown_args = bilby_pipe.utils.parse_args([complete_trigger_ini_file, "--data-dump-file", data_dump_file], bilby_pipe.data_analysis.create_analysis_parser())
+
+            # Modify distance_marginalization_lookuptake
+            if args.distance_marginalization_lookup_table is None:
+                args.distance_marginalization_lookup_table = _dist_marg_lookup_table_filename_template.format(idx)
+
             single_trigger_analysis = SingleTriggerDataAnalysisInput(args, unknown_args)
             self.single_trigger_data_analysis_inputs.append(single_trigger_analysis)
 
