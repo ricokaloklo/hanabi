@@ -1,4 +1,5 @@
 import os
+import subprocess
 import logging
 
 import bilby
@@ -6,7 +7,9 @@ import bilby_pipe
 import bilby_pipe.main
 from bilby_pipe.job_creation.bilby_pipe_dag_creator import get_parallel_list, create_overview
 from bilby_pipe.job_creation.dag import Dag
-from bilby_pipe.job_creation.nodes import GenerationNode, MergeNode, PostProcessSingleResultsNode
+from bilby_pipe.job_creation.nodes import MergeNode, PostProcessSingleResultsNode
+from .fake_generation_node import FakeGenerationNode
+from bilby_pipe.job_creation.bilby_pipe_dag_creator import get_trigger_time_list
 from bilby_pipe.utils import BilbyPipeError
 from .analysis_node import JointAnalysisNode
 
@@ -152,6 +155,21 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
     parallel_list = get_parallel_list(joint_main_input)
 
     # NOTE There is no GenerationNode as all data generations are done in single trigger
+    # Unless --local-generation is turned ON
+    
+    # Run bilby_pipe_generation now if --local-generation is turned ON for the joint analysis
+    if joint_main_input.local_generation:
+        # Loop over triggers
+        for single_trigger_pe_input in single_trigger_pe_inputs:
+            trigger_times = get_trigger_time_list(single_trigger_pe_input)
+            for idx, trigger_time in enumerate(trigger_times):
+                # FakeGenerationNode does not need to know about dag
+                kwargs = dict(trigger_time=trigger_time, idx=idx, dag=None)
+                generation_node = FakeGenerationNode(single_trigger_pe_input, **kwargs)
+                cmd = " ".join([generation_node.executable, generation_node.arguments.print()])
+                p = subprocess.Popen(cmd, shell=True)
+                p.wait() # Launch in background so that multiple hanabi_joint_analysis instances can run at the same time
+
     merged_node_list = []
     all_parallel_node_list = []
     parallel_node_list = []

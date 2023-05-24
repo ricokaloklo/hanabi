@@ -1,5 +1,4 @@
 import os
-import subprocess
 
 from bilby_pipe.job_creation.node import Node
 from .fake_generation_node import FakeGenerationNode
@@ -66,14 +65,6 @@ class JointAnalysisNode(Node):
 
             # Add path to the complete ini file for this trigger
             self.arguments.add("trigger-ini-files", str(single_trigger_pe_input.complete_ini_file))
-
-        # Run bilby_pipe_generation now if --local-generation is turned ON for the joint analysis
-        if joint_main_input.local_generation:
-            # This might not be in the best order, but whatever
-            for generation_node in generation_node_list:
-                cmd = " ".join([generation_node.executable, generation_node.arguments.print()])
-                p = subprocess.Popen(cmd, shell=True)
-                p.wait() # Launch in background so that multiple hanabi_joint_analysis instances can run at the same time
 
         self.arguments.add("label", str(self.label))
         self.extra_lines.extend(self._checkpoint_submit_lines())
