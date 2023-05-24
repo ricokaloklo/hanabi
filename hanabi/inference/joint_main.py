@@ -6,7 +6,8 @@ import bilby_pipe
 import bilby_pipe.main
 from bilby_pipe.job_creation.bilby_pipe_dag_creator import get_parallel_list, create_overview
 from bilby_pipe.job_creation.dag import Dag
-from bilby_pipe.job_creation.nodes import MergeNode, PESummaryNode, PostProcessSingleResultsNode
+from bilby_pipe.job_creation.nodes import MergeNode, PostProcessSingleResultsNode
+from bilby_pipe.utils import BilbyPipeError
 from .analysis_node import JointAnalysisNode
 
 # NOTE Importing the following will initialize a logger for bilby_pipe
@@ -45,6 +46,16 @@ class JointMainInput(bilby_pipe.input.Input):
 
     # The following lines of code are also modified from bilby_pipe
     @property
+    def ini(self):
+        return self._ini
+
+    @ini.setter
+    def ini(self, ini):
+        if os.path.isfile(ini) is False:
+            raise FileNotFoundError(f"No ini file {ini} found")
+        self._ini = os.path.relpath(ini)
+
+    @property
     def notification(self):
         return self._notification
 
@@ -62,6 +73,18 @@ class JointMainInput(bilby_pipe.input.Input):
     @property
     def initialdir(self):
         return os.getcwd()
+
+    @property
+    def request_disk(self):
+        return self._request_disk
+
+    @request_disk.setter
+    def request_disk(self, request_disk):
+        self._request_disk = f"{request_disk}GB"
+        self._request_disk_in_GB = float(request_disk)
+        logger = logging.getLogger(__prog__)
+        logger.debug(f"Setting analysis request_disk={self._request_disk}")
+        self._request_disk = f"{request_disk}GB"
 
     @property
     def request_memory(self):
@@ -163,10 +186,6 @@ def generate_dag(joint_main_input, single_trigger_pe_inputs):
                         dag=dag,
         )
         merged_node_list.append(merge_node)
-
-    # Support PESummaryNode
-    if joint_main_input.create_summary:
-        PESummaryNode(joint_main_input, merged_node_list, generation_node_list, dag=dag)
 
     for merged_node in merged_node_list:
         if joint_main_input.single_postprocessing_executable:
