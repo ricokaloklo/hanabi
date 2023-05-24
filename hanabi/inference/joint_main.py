@@ -43,6 +43,56 @@ class JointMainInput(bilby_pipe.input.Input):
         self.extra_lines = []
         self.requirements = []
 
+    # The following lines of code are also modified from bilby_pipe
+    @property
+    def notification(self):
+        return self._notification
+
+    @notification.setter
+    def notification(self, notification):
+        valid_settings = ["Always", "Complete", "Error", "Never"]
+        if notification in valid_settings:
+            self._notification = notification
+        else:
+            raise BilbyPipeError(
+                "'{}' is not a valid notification setting. "
+                "Valid settings are {}.".format(notification, valid_settings)
+            )
+
+    @property
+    def initialdir(self):
+        return os.getcwd()
+
+    @property
+    def request_memory(self):
+        return self._request_memory
+
+    @request_memory.setter
+    def request_memory(self, request_memory):
+        logger = logging.getLogger(__prog__)
+        logger.info(f"Setting analysis request_memory={request_memory}GB")
+        self._request_memory = f"{request_memory} GB"
+
+    @property
+    def request_memory_generation(self):
+        return self._request_memory_generation
+
+    @request_memory_generation.setter
+    def request_memory_generation(self, request_memory_generation):
+        logger = logging.getLogger(__prog__)
+        logger.info(f"Setting request_memory_generation={request_memory_generation}GB")
+        self._request_memory_generation = f"{request_memory_generation} GB"
+
+    @property
+    def request_cpus(self):
+        return self._request_cpus
+
+    @request_cpus.setter
+    def request_cpus(self, request_cpus):
+        logger = logging.getLogger(__prog__)
+        logger.info(f"Setting analysis request_cpus = {request_cpus}")
+        self._request_cpus = request_cpus
+
 
 def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
     single_trigger_pe_inputs = []
