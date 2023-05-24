@@ -108,7 +108,7 @@ def _add_hanabi_settings_to_parser(parser):
         type=int,
         default=0,
         help=(
-            "Retry an analysis node every N minute to wait for the data generation jobs"
+            "Retry an analysis node every N minute to wait for the data generation jobs "
             "from single trigger to complete. Default is to not retry"
         )
     )
@@ -147,7 +147,7 @@ def _add_hanabi_settings_to_parser(parser):
         type=nonestr,
         default=None,
         help=(
-            "A dictionary of prior for lensing magnification and image type."
+            "A dictionary of prior for lensing magnification and image type. "
             "Specified by lensing-prior-dict={relative-magnification^(1) = 1, relative-magnification^(2) = PowerLaw(...)} for relative magnification, or "
             "lensing-prior-dict={absolute-magnification^(1) = PowerLaw(...), absolute-magnification^(2) = PowerLaw(...)} for absolute magnification"
         )
@@ -171,6 +171,15 @@ def create_joint_main_parser(prog, prog_version):
     base_parser = _create_base_parser(prog, prog_version)
     bilby_pipe_parser = _remove_arguments_from_bilby_pipe_parser_for_hanabi(
         bilby_pipe.parser.create_parser(), prog
+    )
+
+    # Remove --local-generation
+    remove_arguments_from_parser(bilby_pipe_parser, ['local-generation'], prog)
+    # Add our custom --local-generation back
+    bilby_pipe_parser.add(
+        "--local-generation",
+        action="store_true",
+        help="Run the data generation job locally, at the runtime of this program",
     )
 
     joint_main_parser = bilby_pipe.bilbyargparser.BilbyArgParser(

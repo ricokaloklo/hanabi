@@ -6,7 +6,7 @@ import bilby_pipe
 import bilby_pipe.main
 from bilby_pipe.job_creation.bilby_pipe_dag_creator import get_parallel_list, create_overview
 from bilby_pipe.job_creation.dag import Dag
-from bilby_pipe.job_creation.nodes import MergeNode, PostProcessSingleResultsNode
+from bilby_pipe.job_creation.nodes import GenerationNode, MergeNode, PostProcessSingleResultsNode
 from bilby_pipe.utils import BilbyPipeError
 from .analysis_node import JointAnalysisNode
 
@@ -14,6 +14,7 @@ from .analysis_node import JointAnalysisNode
 import bilby_pipe.utils
 # NOTE Importing the following will initialize a logger for hanabi_joint_pipe
 from .utils import (
+    _dist_marg_lookup_table_filename_template,
     setup_logger,
     write_complete_config_file,
     turn_off_forbidden_option,
@@ -120,11 +121,16 @@ class JointMainInput(bilby_pipe.input.Input):
 def generate_single_trigger_pe_inputs(joint_main_input, write_dag=False):
     single_trigger_pe_inputs = []
     logger = logging.getLogger(__prog__)
-    for trigger_ini_file in joint_main_input.trigger_ini_files:
+    for idx, trigger_ini_file in enumerate(joint_main_input.trigger_ini_files):
         logger.info(f"Parsing config ini file {trigger_ini_file}")
         bilby_pipe_parser = bilby_pipe.main.create_parser(top_level=True)
         # NOTE We should probably figure out a mechanism to make sure that the data dump files were generated prior to joint analysis
         args, unknown_args = bilby_pipe.utils.parse_args([trigger_ini_file], bilby_pipe_parser)
+
+        # Modify distance_marginalization_lookup_table
+        if args.distance_marginalization_lookup_table is None:
+            args.distance_marginalization_lookup_table = _dist_marg_lookup_table_filename_template.format(idx)
+
         main_input = bilby_pipe.main.MainInput(args, unknown_args)
 
         turn_off_forbidden_option(main_input, "submit", __prog__)
