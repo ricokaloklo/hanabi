@@ -4,6 +4,7 @@ import os
 import pickle
 import time
 import logging
+import copy
 
 import numpy as np
 import pandas as pd
@@ -11,6 +12,7 @@ from pandas import DataFrame
 
 import bilby
 from bilby.gw import conversion
+import dynesty
 from nestcheck import data_processing
 from bilby_pipe.utils import convert_string_to_list
 
@@ -23,9 +25,8 @@ from parallel_bilby.analysis.read_write import (
     write_current_state,
     write_sample_dump,
 )
-from parallel_bilby.analysis.sample_space import fill_sample
 from parallel_bilby.analysis.analysis_run import AnalysisRun
-from parallel_bilby.analysis.likelihood import setup_likelihood
+from parallel_bilby.analysis.likelihood import setup_likelihood, reorder_loglikelihoods
 
 from .joint_analysis import JointDataAnalysisInput as JointDataAnalysisInputForBilby
 from .parser import create_joint_analysis_pbilby_parser
@@ -39,11 +40,13 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
         self.single_trigger_likelihoods = []
         self.single_trigger_priors = []
         self.single_trigger_args = []
+        self.single_trigger_data_dumps = []
 
         # Loop over data dump files to construct the priors and likelihoods from single triggers
         for idx, data_dump_file in enumerate(self.data_dump_files):
             with open(data_dump_file, "rb") as f:
                 data_dump = pickle.load(f)
+                self.single_trigger_data_dumps.append(copy.deepcopy(data_dump))
                 ifo_list = data_dump["ifo_list"]
                 waveform_generator = data_dump["waveform_generator"]
                 waveform_generator.start_time = ifo_list[0].time_array[0]
@@ -67,8 +70,7 @@ class JointDataAnalysisInput(JointDataAnalysisInputForBilby):
 class JointAnalysisRun(AnalysisRun):
     def __init__(
         self,
-        data_dump_files,
-        joint_analysis_input,
+        joint_data_analysis_input,
         outdir=None,
         label=None,
         dynesty_sample="acceptance-walk",
@@ -91,7 +93,7 @@ class JointAnalysisRun(AnalysisRun):
         self.proposals = convert_string_to_list(proposals)
 
         # Constructing joint likelihood and joint prior
-        likelihood, priors = joint_analysis_input.get_likelihood_and_priors()
+        likelihood, priors = joint_data_analysis_input.get_likelihood_and_priors()
 
         # Manipulating the joint priors
         priors.convert_floats_to_delta_functions()
@@ -149,10 +151,31 @@ class JointAnalysisRun(AnalysisRun):
         self.periodic = periodic
         self.reflective = reflective
         self.nlive = nlive
+        self.joint_data_analysis_input = joint_data_analysis_input
+
+def fill_sample(args):
+    """Fill the sample for a particular row in the posterior data frame.
+
+    This function is used inside a pool.map(), so its interface needs
+    to be a single argument that is then manually unpacked.
+
+    Parameters
+    ----------
+    args: tuple
+        (row number, row, likelihood)
+
+    Returns
+    -------
+    sample: array-like
+
+    """
+    ii, sample, likelihood = args
+    sample = dict(sample).copy()
+    # NOTE: We do not do any conversion and re-generation here
+    return sample
 
 def format_result(
     run,
-    data_dump_files,
     out,
     weights,
     nested_samples,
@@ -194,14 +217,16 @@ def format_result(
     )
     result.priors = run.priors
     result.nested_samples = nested_samples
-    result.meta_data = {} # For now just create an empty dict
+    result.meta_data["command_line_args"] = vars(run.joint_data_analysis_input.args)
     result.meta_data["command_line_args"]["sampler"] = "parallel_bilby"
-    result.meta_data["data_dump"] = data_dump_files
+    result.meta_data["data_dump"] = run.joint_data_analysis_input.data_dump_files
     result.meta_data["likelihood"] = run.likelihood.meta_data
     result.meta_data["sampler_kwargs"] = run.init_sampler_kwargs
     result.meta_data["run_sampler_kwargs"] = sampler_kwargs
-    result.meta_data["injection_parameters"] = run.injection_parameters
-    result.injection_parameters = run.injection_parameters
+    result.meta_data["injection_parameters"] = {
+        data_dump["args"].label: data_dump.get("injection_parameters", None) for data_dump in run.joint_data_analysis_input.single_trigger_data_dumps
+    }
+    result.injection_parameters = None # The existing infrastructure cannot handle this
 
     if rejection_sample_posterior:
         keep = weights > np.random.uniform(0, max(weights), len(weights))
@@ -231,8 +256,7 @@ def format_result(
 
 
 def joint_analysis_runner(
-    data_dump_files,
-    joint_analysis_input,
+    joint_data_analysis_input,
     outdir=None,
     label=None,
     dynesty_sample="acceptance-walk",
@@ -267,8 +291,7 @@ def joint_analysis_runner(
 ):
     # Initialise a run
     run = JointAnalysisRun(
-        data_dump_files=data_dump_files,
-        joint_analysis_input=joint_analysis_input,
+        joint_data_analysis_input,
         outdir=outdir,
         label=label,
         dynesty_sample=dynesty_sample,
@@ -443,7 +466,6 @@ def joint_analysis_runner(
 
                 result = format_result(
                     run,
-                    data_dump_files,
                     out,
                     weights,
                     nested_samples,
@@ -491,8 +513,7 @@ def joint_analysis_runner(
                 )
                 print(f"Number of lnl calls = {result.num_likelihood_evaluations}")
                 print(result)
-                if no_plot is False:
-                    result.plot_corner()
+                # Disable corner plot generating
 
         else:
             exit_reason = -1
@@ -504,5 +525,5 @@ def main():
     analysis_parser = create_joint_analysis_pbilby_parser(__prog__, __version__)
     input_args = parse_analysis_args(analysis_parser, cli_args=cli_args)
 
-    joint_analysis_input = JointDataAnalysisInput(input_args, [])
-    joint_analysis_runner(joint_analysis_input=joint_analysis_input, **vars(input_args))
+    joint_data_analysis_input = JointDataAnalysisInput(input_args, [])
+    joint_analysis_runner(joint_data_analysis_input=joint_data_analysis_input, **vars(input_args))
