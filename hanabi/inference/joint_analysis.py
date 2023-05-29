@@ -52,6 +52,8 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         """
         Initalize multiple SingleTriggerDataAnalysisInput
         """
+        self.args = args
+        self.unknown_args = unknown_args
         # Naming arguments
         self.outdir = args.outdir
         self.label = args.label
