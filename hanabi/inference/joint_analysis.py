@@ -191,7 +191,7 @@ class JointDataAnalysisInput(bilby_pipe.input.Input):
         if self.waveform_cache:
             logger = logging.getLogger(__prog__)
             logger.info(f"Waveform caching enabled")
-            self._check_consistency_between_data_analysis_inputs(self.single_trigger_data_analysis_inputs, ["duration", "minimum_frequency", "maximum_frequency"])
+            self._check_consistency_between_data_analysis_inputs(self.single_trigger_data_analysis_inputs, ["duration"])
             likelihood = hanabi.lensing.likelihood.LensingJointLikelihoodWithWaveformCache(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
         else:
             likelihood = hanabi.lensing.likelihood.LensingJointLikelihood(self.single_trigger_likelihoods, sep_char=self.sep_char, suffix=self.suffix)
