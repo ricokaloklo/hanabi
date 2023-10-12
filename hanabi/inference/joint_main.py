@@ -29,7 +29,7 @@ __version__ = get_version_information()
 
 __prog__ = "hanabi_joint_pipe"
 
-class JointMainInput(bilby_pipe.input.Input):
+class JointMainInput(bilby_pipe.main.MainInput):
     def __init__(self, args, unknown_args):
         self.known_args = args
         self.unknown_args = unknown_args
