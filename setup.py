@@ -89,10 +89,5 @@ setuptools.setup(
         "mpi4py",
         "configargparse==1.4",
     ],
-    classifiers=[
-        "Programming Language :: Python :: 3.8",
-        "Operating System :: MacOS :: MacOS X",
-        "Operating System :: POSIX",
-    ],
     python_requires='>=3.8',
 )
