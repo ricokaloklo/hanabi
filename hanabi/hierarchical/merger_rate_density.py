@@ -26,7 +26,7 @@ class MergerRateDensity(SourcePopulationModel):
 
     def compute_normalization(self):
         zs = np.arange(0, self.population_parameter_dict["redshift_max"], step=1e-3)
-        out = scipy.integrate.simps(self._prob({'redshift': zs}), zs)
+        out = scipy.integrate.simpson(self._prob({'redshift': zs}), zs)
         return out
 
     def _parameter_conversion(self, dataset):

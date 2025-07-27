@@ -44,7 +44,7 @@ class SourceRedshiftProbDist(InterpedCPUOnly):
 
     def compute_normalization(self):
         self.normalization = 1.0
-        norm = scipy.integrate.simps(self._prob(self.zs), self.zs)
+        norm = scipy.integrate.simpson(self._prob(self.zs), self.zs)
         self.normalization = norm
 
 class LensedSourceRedshiftProbDist(SourceRedshiftProbDist):
