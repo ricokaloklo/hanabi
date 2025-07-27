@@ -104,8 +104,8 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
             self.make_fiducial_predictions()
 
     def make_fiducial_predictions(self):
-        # NOTE This requires tensorflow to be installed
-        from hanabi.hierarchical.pdetclassifier import pdetclassifier
+        # NOTE This requires PyTorch to be installed
+        import pdetclassifier
         logger = logging.getLogger(__prog__)
 
         zmin = 0
@@ -330,8 +330,8 @@ class BinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunction):
             self.make_fiducial_predictions()
 
     def make_fiducial_predictions(self):
-        # NOTE This requires tensorflow to be installed
-        from hanabi.hierarchical.pdetclassifier import pdetclassifier
+        # NOTE This requires PyTorch to be installed
+        import pdetclassifier
 
         zmin = 0
         zmax = self.merger_rate_density_src_pop_model.population_parameter_dict.get("redshift_max", 10)
