@@ -45,6 +45,10 @@ class JointMainInput(bilby_pipe.main.MainInput):
         # Sanity check
         assert self.n_triggers == len(self.trigger_ini_files), "n_triggers does not match with the number of config files"
 
+        # NOTE We do not handle data generation in JointMainInput
+        self.data_find_url = None
+        self.data_find_urltype = None
+
         self.extra_lines = []
         self.requirements = []
 
