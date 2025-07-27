@@ -281,7 +281,7 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
                 weights_dL = pdf_dL_pop/pdf_dL_fiducial
                 integrand *= self.predictions[img]*weights_dL
 
-            return float(xp.sum(integrand)/float(self.N_inj))
+            return float(xp.sum(xp.nan_to_num(integrand))/float(self.N_inj))
 
         logger = logging.getLogger(__prog__)
         logger.info("Integrating over source redshift")
