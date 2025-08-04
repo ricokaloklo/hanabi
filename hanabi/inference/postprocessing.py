@@ -8,7 +8,7 @@ from bilby.core.result import reweight
 from bilby.gw.prior import convert_to_flat_in_component_mass_prior, UniformComovingVolume
 from ..lensing.conversion import convert_to_lal_binary_black_hole_parameters_for_lensed_BBH
 from bilby_pipe.bilbyargparser import BilbyArgParser
-from bilby_pipe.utils import parse_args
+from bilby_pipe.utils import parse_args, convert_prior_string_input
 import configargparse
 import logging
 from .utils import ParameterSuffix, load_run_from_pbilby, load_run_from_bilby
@@ -79,6 +79,12 @@ def create_parser(prog):
         help="Generate matched filter and optimal SNRs",
     )
     reconstruction_parser.add(
+        "--generate-sky-frame-parameters",
+        action="store_true",
+        default=False,
+        help="Generate sky frame parameters if missing",
+    )
+    reconstruction_parser.add(
         "--n-triggers",
         type=int,
         default=1,
@@ -138,6 +144,15 @@ def generate_component_mass_parameters(result):
         converted_posterior, added_keys = convert_to_lal_binary_black_hole_parameters_for_lensed_BBH(result.posterior)
         result.posterior = converted_posterior
         logger.info("Adding {} samples".format(", ".join(added_keys)))
+    return result
+
+def generate_sky_frame_parameters(result, likelihood):
+    logger = logging.getLogger(__prog__)
+    # NOTE This function is only for single trigger results and edits the result in-place
+    bilby.gw.conversion.generate_sky_frame_parameters(
+        result.posterior,
+        likelihood
+    )
     return result
 
 def reweight_to_prior(result, new_priors):
@@ -274,9 +289,22 @@ def generate_posterior_samples_from_marginalized_likelihood(
     # Update posterior
     result.posterior = pos_out
     # Update prior
-    priors = bilby.core.prior.PriorDict(filename=result.meta_data["command_line_args"]["prior_file"])
-    result.priors.update(priors)
-    
+    _priors = bilby.core.prior.PriorDict(filename=result.meta_data["command_line_args"]["prior_file"])
+    _priors.update(
+        bilby.core.prior.PriorDict(
+            dictionary=convert_prior_string_input(result.meta_data["command_line_args"]["prior_dict"])
+        )
+    )
+    if likelihood.distance_marginalization:
+        # Update the _luminosity_ distance prior
+        result.priors.update({"luminosity_distance": _priors["luminosity_distance"]})
+    if likelihood.phase_marginalization:
+        # Update the phase prior
+        result.priors.update({"phase": _priors["phase"]})
+    if likelihood.time_marginalization:
+        # Update the time prior
+        result.priors.update({"geocent_time": _priors["geocent_time"]})
+
     return result
 
 def generate_joint_posterior_sample_from_marginalized_likelihood(
@@ -354,6 +382,21 @@ def main():
             result = generate_posterior_samples_from_marginalized_likelihood(result, single_trigger_likelihoods[0], ncores=args.ncores)
         label += "_marginalized_parameter_reconstructed"
 
+    if args.generate_sky_frame_parameters:
+        single_trigger_likelihoods = reconstruct_likelihoods(
+            n_triggers=args.n_triggers,
+            trigger_ini_files=args.trigger_ini_files,
+            data_dump_files=args.data_dump_files,
+            result_from_pbilby=result_from_pbilby,
+        )
+        if not args.not_from_hanabi:
+            if args.n_triggers == 1:
+                result = generate_sky_frame_parameters(result, single_trigger_likelihoods[0])
+            else:
+                raise ValueError("Does not understand input")
+        else:
+            raise NotImplementedError("Joint sky frame parameters are not implemented yet")
+
     if args.generate_component_mass_parameters:
         # Edit file **in-place**
         result = generate_component_mass_parameters(result)
@@ -390,4 +433,3 @@ def main():
     logger.info("Done. Saving to file")
     result.label = label
     result.save_to_file(outdir=".", filename=args.output_filename)
-
