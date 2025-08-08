@@ -1,4 +1,5 @@
 import sys
+import os
 import numpy as np
 import pandas as pd
 import copy
@@ -290,11 +291,12 @@ def generate_posterior_samples_from_marginalized_likelihood(
     result.posterior = pos_out
     # Update prior
     _priors = bilby.core.prior.PriorDict(filename=result.meta_data["command_line_args"]["prior_file"])
-    _priors.update(
-        bilby.core.prior.PriorDict(
-            dictionary=convert_prior_string_input(result.meta_data["command_line_args"]["prior_dict"])
+    if result.meta_data["command_line_args"]["prior_dict"] is not None:
+        _priors.update(
+            bilby.core.prior.PriorDict(
+                dictionary=convert_prior_string_input(result.meta_data["command_line_args"]["prior_dict"])
+            )
         )
-    )
     if likelihood.distance_marginalization:
         # Update the _luminosity_ distance prior
         result.priors.update({"luminosity_distance": _priors["luminosity_distance"]})
@@ -389,7 +391,7 @@ def main():
             data_dump_files=args.data_dump_files,
             result_from_pbilby=result_from_pbilby,
         )
-        if not args.not_from_hanabi:
+        if args.not_from_hanabi:
             if args.n_triggers == 1:
                 result = generate_sky_frame_parameters(result, single_trigger_likelihoods[0])
             else:
@@ -432,4 +434,8 @@ def main():
     # Save to file
     logger.info("Done. Saving to file")
     result.label = label
-    result.save_to_file(outdir=".", filename=args.output_filename)
+    result.save_to_file(
+        outdir=".",
+        filename=args.output_filename,
+        extension=os.path.splitext(args.output_filename)[1].split('.')[1]
+    )
