@@ -421,10 +421,12 @@ def main():
 
     if args.reweight_to_prior is not None:
         result = reweight_to_prior(result, bilby.core.prior.PriorDict(filename=args.reweight_to_prior))
+        result.posterior.reset_index(drop=True, inplace=True)
         label += "_reweighted"
 
     if args.flat_in_component_masses:
         result = reweight_flat_in_component_masses(result)
+        result.posterior.reset_index(drop=True, inplace=True)
         label += "_reweighted"
 
     if args.uniform_in_comoving_volume:
