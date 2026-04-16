@@ -236,6 +236,9 @@ def load_run_from_bilby(data_dump_file, trigger_ini_file, result_file=None, **kw
     single_trigger_analysis = SingleTriggerDataAnalysisInput(args, unknown_args)
     likelihood, priors = single_trigger_analysis.get_likelihood_and_priors()
 
+    if result is not None:
+        priors = result.priors
+
     return likelihood, priors, result
 
 # Initialize a logger for hanabi_joint_pipe

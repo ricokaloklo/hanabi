@@ -51,8 +51,8 @@ version_file = write_version_file(verstr)
 setuptools.setup(
     name="hanabi",
     version=verstr,
-    author="Rico Ka Lok Lo, Ignacio Magana",
-    author_email="kllo@caltech.edu",
+    author="Rico K. L. Lo",
+    author_email="rico.kaloklo@gmail.com",
     description="Hierarchical bayesian ANAlysis on lensed GW signals using BIlby",
     long_description="Identify and characterize strongly-lensed gravitational waves",
     url="https://git.ligo.org/ka-lok.lo/hanabi",
@@ -60,6 +60,7 @@ setuptools.setup(
         "hanabi",
         "hanabi.lensing",
         "hanabi.inference",
+        "hanabi.inference.rapid",
         "hanabi.hierarchical"
     ],
     package_data={
@@ -79,6 +80,7 @@ setuptools.setup(
             "hanabi_joint_pipe_pbilby=hanabi.inference.joint_generation_pbilby:main",
             "hanabi_joint_analysis_pbilby=hanabi.inference.joint_analysis_pbilby:main",
             "hanabi_postprocess_result=hanabi.inference.postprocessing:main",
+            "hanabi_rapid_analysis=hanabi.inference.rapid.rapid_analysis:main",
         ]
     },
     install_requires=[
@@ -88,6 +90,7 @@ setuptools.setup(
         "parallel_bilby>=2.0.2",
         "mpi4py",
         "configargparse==1.4",
+        "denmarf @ git+https://github.com/ricokaloklo/denmarf.git",
     ],
     python_requires='>=3.8',
 )
