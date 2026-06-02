@@ -113,7 +113,8 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
         mmin = self.mass_src_pop_model.population_parameter_dict.get("mmin", 5)
         mmax = self.mass_src_pop_model.population_parameter_dict.get("mmax", 100)
         mmin_det = mmin*(1+zmin) # redshifted
-        mmax_det = mmax*(1+zmax) # redshifted
+        # NOTE This is a non-intrusive way to massively improve the efficiency
+        mmax_det = max(250, mmax*(1+zmax)) # redshifted
 
         # Fiduical detector-frame masses
         fiducial_detector_frame_mass_model = {
@@ -148,7 +149,9 @@ class LensedBinaryBlackHoleSelectionFunctionFromMachineLearning(SelectionFunctio
                             fiducial_intrinsic_pop_models["phi_2"].prob(phi_2)        
 
         # Fiduical apparent luminosity distance distribution
-        fiducial_apparent_luminosity_distance_dist = bilby.gw.prior.UniformComovingVolume(name='luminosity_distance', minimum=zmin, maximum=bilby.gw.conversion.redshift_to_luminosity_distance(zmax), unit='Mpc')
+        apparent_dL_min = zmin # Technically, we need to convert this to luminosity distance, but z = 0 means dL = 0 anyway
+        apparent_dL_max = max(25000, bilby.gw.conversion.redshift_to_luminosity_distance(zmax))
+        fiducial_apparent_luminosity_distance_dist = bilby.gw.prior.UniformComovingVolume(name='luminosity_distance', minimum=apparent_dL_min, maximum=apparent_dL_max, unit='Mpc')
         apparent_dLs = [fiducial_apparent_luminosity_distance_dist.sample(size=self.N_inj) for img in range(self.N_img)]
         apparent_zs = [self.z_from_dL_interpolant(apparent_dL) for apparent_dL in apparent_dLs]
         pdf_dLs_fiducial = []
