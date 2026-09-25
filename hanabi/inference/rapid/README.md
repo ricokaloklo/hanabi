@@ -1,6 +1,6 @@
 # hanabi-rapid
 
 <!-- light mode
-<img width="500" src="https://github.com/user-attachments/assets/b0514c92-e46e-4184-82e6-d0fd06decda6" />
+<img width="500" src="https://github.com/user-attachments/assets/baf22800-7c88-4cfc-a0ef-cfe9399d89a2" />
 -->
-<img width="500" src="https://github.com/user-attachments/assets/cb176fc5-32e4-43a2-b67b-e6a1177f728e" />
+<img width="500" src="https://github.com/user-attachments/assets/d73a68ee-6e95-43dd-94a6-00e7f9695e28" />
