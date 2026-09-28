@@ -49,7 +49,7 @@ def write_version_file(version):
 version_file = write_version_file(verstr)
 
 setuptools.setup(
-    name="hanabi",
+    name="hanabi-gw",
     version=verstr,
     author="Rico K. L. Lo",
     author_email="rico.kaloklo@gmail.com",
@@ -90,7 +90,7 @@ setuptools.setup(
         "parallel_bilby>=2.0.2",
         "mpi4py",
         "configargparse==1.4",
-        "denmarf @ git+https://github.com/ricokaloklo/denmarf.git",
+        "denmarf",
     ],
     python_requires='>=3.8',
 )
