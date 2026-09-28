@@ -55,7 +55,7 @@ setuptools.setup(
     author_email="rico.kaloklo@gmail.com",
     description="Hierarchical bayesian ANAlysis on lensed GW signals using BIlby",
     long_description="Identify and characterize lensed gravitational waves",
-    url="https://git.ligo.org/ka-lok.lo/hanabi",
+    url="https://github.com/ricokaloklo/hanabi",
     packages=[
         "hanabi",
         "hanabi.lensing",
