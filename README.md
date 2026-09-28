@@ -1,5 +1,8 @@
 # hanabi
 
+![license](https://img.shields.io/github/license/ricokaloklo/hanabi)
+[![GitHub release](https://img.shields.io/github/v/release/ricokaloklo/hanabi.svg)](https://github.com/ricokaloklo/hanabi/releases)
+
 Hierarchical bayesian ANAlysis on lensed GW signals using BIlby
 
 <p align="left">
